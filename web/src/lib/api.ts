@@ -1,7 +1,9 @@
-const API_BASE =
-  (typeof import.meta !== 'undefined' && import.meta.env?.PUBLIC_API_URL) ||
-  (typeof process !== 'undefined' && process.env?.PUBLIC_API_URL) ||
-  'http://localhost:3101';
+export function getApiBase(): string {
+  if (typeof window === 'undefined') {
+    return process.env.INTERNAL_API_URL || process.env.PUBLIC_API_URL || 'http://localhost:3101';
+  }
+  return import.meta.env.PUBLIC_API_URL || 'http://localhost:3101';
+}
 
 export interface Client {
   id: string;
@@ -53,7 +55,7 @@ export interface OnboardClientRequest {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${getApiBase()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

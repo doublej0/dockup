@@ -32,6 +32,7 @@ services:
       - PORT=3100
       - HOST=0.0.0.0
       - PUBLIC_API_URL=${DOCKUP_PUBLIC_API_URL}
+      - INTERNAL_API_URL=http://dockup-api:3101
     ports:
       - "3100:3100"
     depends_on:

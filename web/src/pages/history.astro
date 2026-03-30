@@ -12,6 +12,7 @@ const PER_PAGE = 50;
 let jobs = [];
 let clients = [];
 let fetchError = '';
+const publicApiUrl = import.meta.env.PUBLIC_API_URL || process.env.PUBLIC_API_URL || 'http://localhost:3101';
 
 try {
   [jobs, clients] = await Promise.all([
@@ -112,8 +113,23 @@ function buildUrl(params: Record<string, string | number>) {
   </form>
 
   {fetchError && (
-    <div class="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
-      <strong>Error:</strong> {fetchError}
+    <div class="mb-6 p-5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+        </svg>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">Having trouble reaching the API</p>
+          <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">Check that the DockUp API is running and reachable, then review the API container logs for details.</p>
+          <p class="text-xs text-amber-600 dark:text-amber-400 mt-2 font-mono">API should be available at {publicApiUrl}</p>
+          <button
+            onclick="window.location.reload()"
+            class="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
     </div>
   )}
 
@@ -191,8 +207,13 @@ function buildUrl(params: Record<string, string | number>) {
     </div>
   ) : !fetchError ? (
     <div class="text-center py-24">
-      <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-2">No update history</h2>
-      <p class="text-gray-500 dark:text-slate-400">Trigger updates from the client page to see history here.</p>
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700/50 mb-4">
+        <svg class="w-8 h-8 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-2">No update history yet</h2>
+      <p class="text-gray-500 dark:text-slate-400 max-w-sm mx-auto">Update history will appear here once containers are updated through DockUp.</p>
     </div>
   ) : null}
 </Layout>

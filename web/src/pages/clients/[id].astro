@@ -33,8 +33,37 @@ const apiBase =
   </div>
 
   {fetchError && (
-    <div class="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
-      <strong>Error:</strong> {fetchError}
+    <div class="mb-6 p-5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+        </svg>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">Having trouble reaching the API</p>
+          <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">Check that the DockUp API is running and reachable, then review the API container logs for details.</p>
+          <button
+            onclick="window.location.reload()"
+            class="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {client && !client.connected && (
+    <div class="mb-4 px-4 py-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-300">
+      <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+      </svg>
+      <span>
+        Agent is disconnected — container data may be stale.
+        {client.last_seen && (
+          <> Last seen: <span class="last-seen-ts font-mono text-xs" data-ts={client.last_seen}>{client.last_seen}</span></>
+        )}
+        {!client.last_seen && <> Never connected.</>}
+      </span>
     </div>
   )}
 
@@ -132,7 +161,19 @@ const apiBase =
       <!-- Containers -->
       <div class="mb-6">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">Containers</h2>
-        <ContainerGrid containers={containers} clientId={client.id} />
+        {containers.length > 0 ? (
+          <ContainerGrid containers={containers} clientId={client.id} />
+        ) : (
+          <div class="text-center py-16 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 mb-3">
+              <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+              </svg>
+            </div>
+            <p class="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">No running containers found on this host</p>
+            <p class="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">If this looks wrong, check that the agent is connected and the Docker socket is accessible.</p>
+          </div>
+        )}
       </div>
 
       <UpdateJobStream clientId={client.id} />
@@ -142,6 +183,13 @@ const apiBase =
 
 <script define:vars={{ apiBase, clientId: id }}>
   (function() {
+    document.querySelectorAll('.last-seen-ts').forEach(function(el) {
+      const ts = el.dataset.ts;
+      if (!ts) return;
+      try {
+        el.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(ts));
+      } catch(e) { /* leave raw */ }
+    });
     const editBtn = document.getElementById('edit-client-btn');
     const editForm = document.getElementById('edit-form');
     const cancelBtn = document.getElementById('cancel-edit-btn');

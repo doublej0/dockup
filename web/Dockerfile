@@ -10,7 +10,7 @@ RUN npm run build
 
 FROM node:20-slim
 
-RUN groupadd -g 1000 appuser && useradd -u 1000 -g appuser -s /bin/sh appuser
+RUN useradd -u 1001 -s /bin/sh -m appuser
 
 WORKDIR /app
 

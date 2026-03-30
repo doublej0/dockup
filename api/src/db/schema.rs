@@ -4,71 +4,42 @@ use sqlx::SqlitePool;
 use crate::models::{Client, Container, UpdateJob};
 
 pub async fn get_all_clients(pool: &SqlitePool) -> Result<Vec<Client>> {
-    let rows = sqlx::query!(
-        r#"SELECT id, name, host, color, compose_file_path, agent_version, agent_update_mode,
-                  last_seen, connected as "connected: i64", created_at FROM clients ORDER BY created_at DESC"#
+    let rows = sqlx::query_as::<_, Client>(
+        "SELECT id, name, host, color, compose_file_path, agent_version, agent_update_mode,
+                last_seen, connected, created_at FROM clients ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await?;
-
-    let clients = rows
-        .into_iter()
-        .map(|r| Client {
-            id: r.id,
-            name: r.name,
-            host: r.host,
-            color: r.color,
-            compose_file_path: r.compose_file_path,
-            agent_version: r.agent_version,
-            agent_update_mode: r.agent_update_mode,
-            last_seen: r.last_seen,
-            connected: r.connected != 0,
-            created_at: r.created_at,
-        })
-        .collect();
-
-    Ok(clients)
+    Ok(rows)
 }
 
 pub async fn get_client(pool: &SqlitePool, id: &str) -> Result<Option<Client>> {
-    let row = sqlx::query!(
-        r#"SELECT id, name, host, color, compose_file_path, agent_version, agent_update_mode,
-                  last_seen, connected as "connected: i64", created_at FROM clients WHERE id = ?"#,
-        id
+    let row = sqlx::query_as::<_, Client>(
+        "SELECT id, name, host, color, compose_file_path, agent_version, agent_update_mode,
+                last_seen, connected, created_at FROM clients WHERE id = ?",
     )
+    .bind(id)
     .fetch_optional(pool)
     .await?;
-
-    Ok(row.map(|r| Client {
-        id: r.id,
-        name: r.name,
-        host: r.host,
-        color: r.color,
-        compose_file_path: r.compose_file_path,
-        agent_version: r.agent_version,
-        agent_update_mode: r.agent_update_mode,
-        last_seen: r.last_seen,
-        connected: r.connected != 0,
-        created_at: r.created_at,
-    }))
+    Ok(row)
 }
 
 pub async fn insert_client(pool: &SqlitePool, client: &Client) -> Result<()> {
     let connected: i64 = if client.connected { 1 } else { 0 };
-    sqlx::query!(
-        r#"INSERT INTO clients (id, name, host, color, compose_file_path, agent_version, agent_update_mode, last_seen, connected, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
-        client.id,
-        client.name,
-        client.host,
-        client.color,
-        client.compose_file_path,
-        client.agent_version,
-        client.agent_update_mode,
-        client.last_seen,
-        connected,
-        client.created_at,
+    sqlx::query(
+        "INSERT INTO clients (id, name, host, color, compose_file_path, agent_version, agent_update_mode, last_seen, connected, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
+    .bind(&client.id)
+    .bind(&client.name)
+    .bind(&client.host)
+    .bind(&client.color)
+    .bind(&client.compose_file_path)
+    .bind(&client.agent_version)
+    .bind(&client.agent_update_mode)
+    .bind(&client.last_seen)
+    .bind(connected)
+    .bind(&client.created_at)
     .execute(pool)
     .await?;
     Ok(())
@@ -82,21 +53,22 @@ pub async fn update_client(
     compose_file_path: Option<&str>,
     agent_update_mode: &str,
 ) -> Result<()> {
-    sqlx::query!(
-        r#"UPDATE clients SET name = ?, color = ?, compose_file_path = ?, agent_update_mode = ? WHERE id = ?"#,
-        name,
-        color,
-        compose_file_path,
-        agent_update_mode,
-        id,
+    sqlx::query(
+        "UPDATE clients SET name = ?, color = ?, compose_file_path = ?, agent_update_mode = ? WHERE id = ?",
     )
+    .bind(name)
+    .bind(color)
+    .bind(compose_file_path)
+    .bind(agent_update_mode)
+    .bind(id)
     .execute(pool)
     .await?;
     Ok(())
 }
 
 pub async fn delete_client(pool: &SqlitePool, id: &str) -> Result<()> {
-    sqlx::query!("DELETE FROM clients WHERE id = ?", id)
+    sqlx::query("DELETE FROM clients WHERE id = ?")
+        .bind(id)
         .execute(pool)
         .await?;
     Ok(())
@@ -109,25 +81,21 @@ pub async fn set_client_connected(
     last_seen: Option<&str>,
 ) -> Result<()> {
     let connected_int: i64 = if connected { 1 } else { 0 };
-    sqlx::query!(
-        "UPDATE clients SET connected = ?, last_seen = ? WHERE id = ?",
-        connected_int,
-        last_seen,
-        id,
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE clients SET connected = ?, last_seen = ? WHERE id = ?")
+        .bind(connected_int)
+        .bind(last_seen)
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
 pub async fn set_client_agent_version(pool: &SqlitePool, id: &str, version: &str) -> Result<()> {
-    sqlx::query!(
-        "UPDATE clients SET agent_version = ? WHERE id = ?",
-        version,
-        id,
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE clients SET agent_version = ? WHERE id = ?")
+        .bind(version)
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -136,30 +104,18 @@ pub async fn get_containers_for_client(
     client_id: &str,
     include_stopped: bool,
 ) -> Result<Vec<Container>> {
-    let rows = sqlx::query!(
-        r#"SELECT id, client_id, container_name, image, current_digest, latest_digest,
-                  update_available as "update_available: i64", update_mode, status, checked_at
-           FROM containers WHERE client_id = ?"#,
-        client_id
+    let rows = sqlx::query_as::<_, Container>(
+        "SELECT id, client_id, container_name, image, current_digest, latest_digest,
+                update_available, update_mode, status, checked_at
+         FROM containers WHERE client_id = ?",
     )
+    .bind(client_id)
     .fetch_all(pool)
     .await?;
 
     let containers = rows
         .into_iter()
-        .filter(|r| include_stopped || r.status == "running")
-        .map(|r| Container {
-            id: r.id,
-            client_id: r.client_id,
-            container_name: r.container_name,
-            image: r.image,
-            current_digest: r.current_digest,
-            latest_digest: r.latest_digest,
-            update_available: r.update_available != 0,
-            update_mode: r.update_mode,
-            status: r.status,
-            checked_at: r.checked_at,
-        })
+        .filter(|c| include_stopped || c.status == "running")
         .collect();
 
     Ok(containers)
@@ -167,27 +123,27 @@ pub async fn get_containers_for_client(
 
 pub async fn upsert_container(pool: &SqlitePool, container: &Container) -> Result<()> {
     let update_available: i64 = if container.update_available { 1 } else { 0 };
-    sqlx::query!(
-        r#"INSERT INTO containers (id, client_id, container_name, image, current_digest, latest_digest, update_available, update_mode, status, checked_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(client_id, container_name) DO UPDATE SET
-               image = excluded.image,
-               status = excluded.status,
-               current_digest = COALESCE(excluded.current_digest, current_digest),
-               latest_digest = COALESCE(excluded.latest_digest, latest_digest),
-               update_available = excluded.update_available,
-               checked_at = excluded.checked_at"#,
-        container.id,
-        container.client_id,
-        container.container_name,
-        container.image,
-        container.current_digest,
-        container.latest_digest,
-        update_available,
-        container.update_mode,
-        container.status,
-        container.checked_at,
+    sqlx::query(
+        "INSERT INTO containers (id, client_id, container_name, image, current_digest, latest_digest, update_available, update_mode, status, checked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(client_id, container_name) DO UPDATE SET
+             image = excluded.image,
+             status = excluded.status,
+             current_digest = COALESCE(excluded.current_digest, current_digest),
+             latest_digest = COALESCE(excluded.latest_digest, latest_digest),
+             update_available = excluded.update_available,
+             checked_at = excluded.checked_at",
     )
+    .bind(&container.id)
+    .bind(&container.client_id)
+    .bind(&container.container_name)
+    .bind(&container.image)
+    .bind(&container.current_digest)
+    .bind(&container.latest_digest)
+    .bind(update_available)
+    .bind(&container.update_mode)
+    .bind(&container.status)
+    .bind(&container.checked_at)
     .execute(pool)
     .await?;
     Ok(())
@@ -199,12 +155,12 @@ pub async fn update_container_mode(
     container_name: &str,
     update_mode: &str,
 ) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         "UPDATE containers SET update_mode = ? WHERE client_id = ? AND container_name = ?",
-        update_mode,
-        client_id,
-        container_name,
     )
+    .bind(update_mode)
+    .bind(client_id)
+    .bind(container_name)
     .execute(pool)
     .await?;
     Ok(())
@@ -220,88 +176,61 @@ pub async fn update_container_digest(
 ) -> Result<()> {
     let update_available_int: i64 = if update_available { 1 } else { 0 };
     let now = chrono::Utc::now().to_rfc3339();
-    sqlx::query!(
-        r#"UPDATE containers SET current_digest = ?, latest_digest = ?, update_available = ?, checked_at = ?
-           WHERE client_id = ? AND container_name = ?"#,
-        current_digest,
-        latest_digest,
-        update_available_int,
-        now,
-        client_id,
-        container_name,
+    sqlx::query(
+        "UPDATE containers SET current_digest = ?, latest_digest = ?, update_available = ?, checked_at = ?
+         WHERE client_id = ? AND container_name = ?",
     )
+    .bind(current_digest)
+    .bind(latest_digest)
+    .bind(update_available_int)
+    .bind(&now)
+    .bind(client_id)
+    .bind(container_name)
     .execute(pool)
     .await?;
     Ok(())
 }
 
 pub async fn insert_update_job(pool: &SqlitePool, job: &UpdateJob) -> Result<()> {
-    sqlx::query!(
-        r#"INSERT INTO update_jobs (id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
-        job.id,
-        job.client_id,
-        job.container_name,
-        job.image,
-        job.from_digest,
-        job.to_digest,
-        job.status,
-        job.output,
-        job.started_at,
-        job.completed_at,
+    sqlx::query(
+        "INSERT INTO update_jobs (id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
+    .bind(&job.id)
+    .bind(&job.client_id)
+    .bind(&job.container_name)
+    .bind(&job.image)
+    .bind(&job.from_digest)
+    .bind(&job.to_digest)
+    .bind(&job.status)
+    .bind(&job.output)
+    .bind(&job.started_at)
+    .bind(&job.completed_at)
     .execute(pool)
     .await?;
     Ok(())
 }
 
 pub async fn get_jobs_for_client(pool: &SqlitePool, client_id: &str) -> Result<Vec<UpdateJob>> {
-    let rows = sqlx::query!(
+    let rows = sqlx::query_as::<_, UpdateJob>(
         "SELECT id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at
          FROM update_jobs WHERE client_id = ? ORDER BY started_at DESC",
-        client_id
     )
+    .bind(client_id)
     .fetch_all(pool)
     .await?;
-
-    Ok(rows
-        .into_iter()
-        .map(|r| UpdateJob {
-            id: r.id,
-            client_id: r.client_id,
-            container_name: r.container_name,
-            image: r.image,
-            from_digest: r.from_digest,
-            to_digest: r.to_digest,
-            status: r.status,
-            output: r.output,
-            started_at: r.started_at,
-            completed_at: r.completed_at,
-        })
-        .collect())
+    Ok(rows)
 }
 
 pub async fn get_job(pool: &SqlitePool, id: &str) -> Result<Option<UpdateJob>> {
-    let row = sqlx::query!(
+    let row = sqlx::query_as::<_, UpdateJob>(
         "SELECT id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at
          FROM update_jobs WHERE id = ?",
-        id
     )
+    .bind(id)
     .fetch_optional(pool)
     .await?;
-
-    Ok(row.map(|r| UpdateJob {
-        id: r.id,
-        client_id: r.client_id,
-        container_name: r.container_name,
-        image: r.image,
-        from_digest: r.from_digest,
-        to_digest: r.to_digest,
-        status: r.status,
-        output: r.output,
-        started_at: r.started_at,
-        completed_at: r.completed_at,
-    }))
+    Ok(row)
 }
 
 pub async fn update_job_status(
@@ -311,24 +240,24 @@ pub async fn update_job_status(
     output: Option<&str>,
     completed_at: Option<&str>,
 ) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         "UPDATE update_jobs SET status = ?, output = ?, completed_at = ? WHERE id = ?",
-        status,
-        output,
-        completed_at,
-        id,
     )
+    .bind(status)
+    .bind(output)
+    .bind(completed_at)
+    .bind(id)
     .execute(pool)
     .await?;
     Ok(())
 }
 
 pub async fn append_job_output(pool: &SqlitePool, id: &str, chunk: &str) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         "UPDATE update_jobs SET output = COALESCE(output, '') || ? WHERE id = ?",
-        chunk,
-        id,
     )
+    .bind(chunk)
+    .bind(id)
     .execute(pool)
     .await?;
     Ok(())
@@ -340,30 +269,15 @@ pub async fn get_recent_jobs(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<UpdateJob>> {
-    let rows = sqlx::query!(
+    let rows = sqlx::query_as::<_, UpdateJob>(
         "SELECT id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at
          FROM update_jobs ORDER BY started_at DESC LIMIT ? OFFSET ?",
-        limit,
-        offset
     )
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
-
-    Ok(rows
-        .into_iter()
-        .map(|r| UpdateJob {
-            id: r.id,
-            client_id: r.client_id,
-            container_name: r.container_name,
-            image: r.image,
-            from_digest: r.from_digest,
-            to_digest: r.to_digest,
-            status: r.status,
-            output: r.output,
-            started_at: r.started_at,
-            completed_at: r.completed_at,
-        })
-        .collect())
+    Ok(rows)
 }
 
 pub async fn get_recent_jobs_filtered(
@@ -373,59 +287,51 @@ pub async fn get_recent_jobs_filtered(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<UpdateJob>> {
-    // Build query dynamically based on optional filters
     let rows = match (client_id, status) {
         (Some(cid), Some(st)) => {
-            sqlx::query!(
+            sqlx::query_as::<_, UpdateJob>(
                 "SELECT id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at
                  FROM update_jobs WHERE client_id = ? AND status = ? ORDER BY started_at DESC LIMIT ? OFFSET ?",
-                cid, st, limit, offset
             )
+            .bind(cid)
+            .bind(st)
+            .bind(limit)
+            .bind(offset)
             .fetch_all(pool)
             .await?
         }
         (Some(cid), None) => {
-            sqlx::query!(
+            sqlx::query_as::<_, UpdateJob>(
                 "SELECT id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at
                  FROM update_jobs WHERE client_id = ? ORDER BY started_at DESC LIMIT ? OFFSET ?",
-                cid, limit, offset
             )
+            .bind(cid)
+            .bind(limit)
+            .bind(offset)
             .fetch_all(pool)
             .await?
         }
         (None, Some(st)) => {
-            sqlx::query!(
+            sqlx::query_as::<_, UpdateJob>(
                 "SELECT id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at
                  FROM update_jobs WHERE status = ? ORDER BY started_at DESC LIMIT ? OFFSET ?",
-                st, limit, offset
             )
+            .bind(st)
+            .bind(limit)
+            .bind(offset)
             .fetch_all(pool)
             .await?
         }
         (None, None) => {
-            sqlx::query!(
+            sqlx::query_as::<_, UpdateJob>(
                 "SELECT id, client_id, container_name, image, from_digest, to_digest, status, output, started_at, completed_at
                  FROM update_jobs ORDER BY started_at DESC LIMIT ? OFFSET ?",
-                limit, offset
             )
+            .bind(limit)
+            .bind(offset)
             .fetch_all(pool)
             .await?
         }
     };
-
-    Ok(rows
-        .into_iter()
-        .map(|r| UpdateJob {
-            id: r.id,
-            client_id: r.client_id,
-            container_name: r.container_name,
-            image: r.image,
-            from_digest: r.from_digest,
-            to_digest: r.to_digest,
-            status: r.status,
-            output: r.output,
-            started_at: r.started_at,
-            completed_at: r.completed_at,
-        })
-        .collect())
+    Ok(rows)
 }

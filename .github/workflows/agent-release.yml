@@ -14,8 +14,10 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             artifact_name: dockup-agent-x86_64
+            use_cross: false
           - target: aarch64-unknown-linux-gnu
             artifact_name: dockup-agent-aarch64
+            use_cross: true
 
     steps:
       - name: Checkout
@@ -27,17 +29,19 @@ jobs:
           toolchain: "1.88.0"
           targets: ${{ matrix.target }}
 
-      - name: Install cross-compilation tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
 
-      - name: Build agent
+      - name: Build agent (native)
+        if: "!matrix.use_cross"
         working-directory: agent
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-        run: |
-          cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build agent (cross)
+        if: matrix.use_cross
+        working-directory: agent
+        run: cross build --release --target ${{ matrix.target }}
 
       - name: Rename binary
         run: |

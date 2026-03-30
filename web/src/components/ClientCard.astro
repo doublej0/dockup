@@ -1,0 +1,138 @@
+---
+import type { Client } from '../lib/api';
+
+export interface Props {
+  client: Client;
+  containerSummary: {
+    running: number;
+    updatesAvailable: number;
+  };
+}
+
+const { client, containerSummary } = Astro.props;
+
+function formatLastSeen(ts: string | null): string {
+  if (!ts) return 'Never';
+  // Return raw ISO string; client-side JS will localise it
+  return ts;
+}
+---
+
+<div
+  class="bg-white dark:bg-slate-800 rounded-xl border-l-4 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+  style={`border-left-color: ${client.color}`}
+  data-client-id={client.id}
+>
+  <div class="p-5">
+    <!-- Header row -->
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <span
+          class={`flex-shrink-0 inline-block w-2.5 h-2.5 rounded-full ${client.connected ? 'bg-green-400' : 'bg-gray-300 dark:bg-slate-600'}`}
+          title={client.connected ? 'Connected' : 'Disconnected'}
+        ></span>
+        <h2 class="text-base font-semibold truncate">
+          <a href={`/clients/${client.id}`} class="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+            {client.name}
+          </a>
+        </h2>
+      </div>
+
+      {containerSummary.updatesAvailable > 0 && (
+        <button
+          class="flex-shrink-0 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+          data-update-all={client.id}
+          title={`Update all ${containerSummary.updatesAvailable} containers`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+            <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+          </svg>
+          {containerSummary.updatesAvailable} update{containerSummary.updatesAvailable !== 1 ? 's' : ''}
+        </button>
+      )}
+    </div>
+
+    <!-- Host -->
+    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400 truncate">
+      {client.host}
+    </p>
+
+    <!-- Stats -->
+    <div class="mt-3 flex items-center gap-4 text-sm text-gray-600 dark:text-slate-300">
+      <span class="flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <span>{containerSummary.running} running</span>
+      </span>
+
+      {client.agent_version && (
+        <span class="text-xs text-gray-400 dark:text-slate-500">
+          v{client.agent_version}
+        </span>
+      )}
+    </div>
+
+    <!-- Last seen -->
+    <p class="mt-2 text-xs text-gray-400 dark:text-slate-500">
+      Last seen: <span class="last-seen-ts" data-ts={client.last_seen ?? ''}>{formatLastSeen(client.last_seen)}</span>
+    </p>
+  </div>
+
+  <!-- Footer -->
+  <div class="px-5 py-3 bg-gray-50 dark:bg-slate-700/50 border-t border-gray-100 dark:border-slate-700 flex items-center justify-between">
+    <a
+      href={`/clients/${client.id}`}
+      class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+    >
+      View details →
+    </a>
+    <span class={`text-xs px-2 py-0.5 rounded-full ${
+      client.agent_update_mode === 'auto'
+        ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+        : 'bg-gray-100 dark:bg-slate-600 text-gray-500 dark:text-slate-300'
+    }`}>
+      {client.agent_update_mode}
+    </span>
+  </div>
+</div>
+
+<script>
+  // Localise timestamps
+  document.querySelectorAll<HTMLElement>('.last-seen-ts').forEach(el => {
+    const ts = el.dataset.ts;
+    if (!ts) { el.textContent = 'Never'; return; }
+    try {
+      el.textContent = new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(ts));
+    } catch {
+      // leave as-is
+    }
+  });
+
+  // Update all button
+  document.querySelectorAll<HTMLButtonElement>('[data-update-all]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const clientId = btn.dataset.updateAll!;
+      btn.disabled = true;
+      btn.textContent = 'Updating…';
+      try {
+        const apiBase =
+          (document.querySelector('meta[name="api-base"]') as HTMLMetaElement)?.content ||
+          'http://localhost:3101';
+        await fetch(`${apiBase}/api/clients/${clientId}/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ all: true }),
+        });
+        btn.textContent = 'Triggered!';
+      } catch (e) {
+        btn.textContent = 'Failed';
+        btn.disabled = false;
+      }
+    });
+  });
+</script>

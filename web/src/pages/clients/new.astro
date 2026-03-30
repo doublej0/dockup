@@ -1,0 +1,257 @@
+---
+import Layout from '../../components/Layout.astro';
+
+const apiBase =
+  import.meta.env.PUBLIC_API_URL ||
+  process.env.PUBLIC_API_URL ||
+  'http://localhost:3101';
+
+const PRESET_COLORS = [
+  '#6366f1', // indigo
+  '#8b5cf6', // violet
+  '#06b6d4', // cyan
+  '#10b981', // emerald
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#ec4899', // pink
+  '#64748b', // slate
+];
+---
+
+<Layout title="Add Client">
+  <div class="max-w-xl mx-auto">
+    <div class="mb-6">
+      <a href="/clients" class="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200">← Back to clients</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-6">Add Docker Host</h1>
+
+    <div id="progress-banner" class="hidden mb-4 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-sm">
+      <div class="flex items-center gap-2">
+        <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <span id="progress-text">Installing agent…</span>
+      </div>
+    </div>
+
+    <div id="error-banner" class="hidden mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"></div>
+
+    <form
+      id="onboard-form"
+      class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm p-6 space-y-5"
+    >
+      <!-- Name -->
+      <div>
+        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Name <span class="text-red-500">*</span></label>
+        <input
+          id="name"
+          name="name"
+          type="text"
+          required
+          placeholder="Production server"
+          class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <!-- Host -->
+      <div>
+        <label for="host" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Host / IP <span class="text-red-500">*</span></label>
+        <input
+          id="host"
+          name="host"
+          type="text"
+          required
+          placeholder="192.168.1.100"
+          class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <!-- SSH User + Password -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="ssh_user" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">SSH User <span class="text-red-500">*</span></label>
+          <input
+            id="ssh_user"
+            name="ssh_user"
+            type="text"
+            required
+            placeholder="root"
+            class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label for="ssh_password" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">SSH Password <span class="text-red-500">*</span></label>
+          <input
+            id="ssh_password"
+            name="ssh_password"
+            type="password"
+            required
+            placeholder="••••••••"
+            class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+
+      <p class="text-xs text-gray-400 dark:text-slate-500">
+        SSH credentials are used only for installation and are never stored.
+      </p>
+
+      <!-- Compose file path -->
+      <div>
+        <label for="compose_file_path" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Compose file path <span class="text-gray-400 font-normal">(optional)</span></label>
+        <input
+          id="compose_file_path"
+          name="compose_file_path"
+          type="text"
+          placeholder="/opt/myapp/docker-compose.yml"
+          class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <!-- Color picker -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Color</label>
+        <div class="flex items-center gap-2 flex-wrap">
+          {PRESET_COLORS.map(color => (
+            <button
+              type="button"
+              class="color-swatch w-7 h-7 rounded-full border-2 border-transparent hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              style={`background-color: ${color}`}
+              data-color={color}
+              title={color}
+            ></button>
+          ))}
+          <input
+            type="color"
+            id="color-custom"
+            class="w-7 h-7 rounded-full cursor-pointer border border-gray-300 dark:border-slate-600"
+            title="Custom color"
+          />
+        </div>
+        <input type="hidden" id="color" name="color" value={PRESET_COLORS[0]} />
+      </div>
+
+      <!-- Agent update mode -->
+      <div>
+        <label for="agent_update_mode" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Agent update mode</label>
+        <select
+          id="agent_update_mode"
+          name="agent_update_mode"
+          class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="manual">Manual — only update when triggered</option>
+          <option value="auto">Auto — update automatically when new versions available</option>
+        </select>
+      </div>
+
+      <button
+        type="submit"
+        id="submit-btn"
+        class="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Install Agent & Add Client
+      </button>
+    </form>
+  </div>
+</Layout>
+
+<script define:vars={{ apiBase }}>
+  (function() {
+    // Color picker logic
+    const colorHiddenInput = document.getElementById('color');
+    let selectedColor = '#6366f1';
+
+    function selectColor(color) {
+      selectedColor = color;
+      colorHiddenInput.value = color;
+      document.querySelectorAll('.color-swatch').forEach(sw => {
+        const isSelected = sw.dataset.color === color;
+        sw.style.borderColor = isSelected ? '#1e293b' : 'transparent';
+        sw.style.transform = isSelected ? 'scale(1.2)' : '';
+      });
+    }
+
+    // Select first color by default
+    selectColor('#6366f1');
+
+    document.querySelectorAll('.color-swatch').forEach(btn => {
+      btn.addEventListener('click', () => selectColor(btn.dataset.color));
+    });
+
+    const colorCustom = document.getElementById('color-custom');
+    colorCustom.addEventListener('input', () => {
+      selectColor(colorCustom.value);
+    });
+
+    // Form submission
+    const form = document.getElementById('onboard-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const progressBanner = document.getElementById('progress-banner');
+    const progressText = document.getElementById('progress-text');
+    const errorBanner = document.getElementById('error-banner');
+
+    const progressSteps = [
+      'Connecting via SSH…',
+      'Detecting architecture…',
+      'Writing agent config…',
+      'Downloading agent binary…',
+      'Installing systemd service…',
+      'Starting agent service…',
+      'Waiting for agent connection…',
+    ];
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBanner.classList.add('hidden');
+      progressBanner.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      // Cycle through progress messages
+      let step = 0;
+      progressText.textContent = progressSteps[0];
+      const progressInterval = setInterval(() => {
+        step = (step + 1) % progressSteps.length;
+        progressText.textContent = progressSteps[step];
+      }, 4000);
+
+      const data = {
+        name: form.name.value.trim(),
+        host: form.host.value.trim(),
+        ssh_user: form.ssh_user.value.trim(),
+        ssh_password: form.ssh_password.value,
+        compose_file_path: form.compose_file_path.value.trim() || null,
+        color: colorHiddenInput.value,
+        agent_update_mode: form.agent_update_mode.value,
+      };
+
+      try {
+        const res = await fetch(`${apiBase}/api/onboard`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+
+        clearInterval(progressInterval);
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => res.statusText);
+          throw new Error(errText);
+        }
+
+        const client = await res.json();
+        progressText.textContent = 'Agent installed and connected!';
+        setTimeout(() => {
+          window.location.href = `/clients/${client.id}`;
+        }, 800);
+      } catch(e) {
+        clearInterval(progressInterval);
+        progressBanner.classList.add('hidden');
+        submitBtn.disabled = false;
+        errorBanner.classList.remove('hidden');
+        errorBanner.textContent = `Onboarding failed: ${e.message}`;
+      }
+    });
+  })();
+</script>

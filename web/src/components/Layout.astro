@@ -1,0 +1,152 @@
+---
+import { themeInitScript } from '../lib/theme';
+
+export interface Props {
+  title?: string;
+}
+
+const { title = 'DockUp' } = Astro.props;
+const currentPath = Astro.url.pathname;
+
+const navLinks = [
+  { href: '/', label: 'Dashboard' },
+  { href: '/clients', label: 'Clients' },
+  { href: '/history', label: 'History' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — DockUp</title>
+    <script set:html={themeInitScript} />
+    <style>
+      :root {
+        --color-bg: #f9fafb;
+        --color-surface: #ffffff;
+        --color-border: #e5e7eb;
+        --color-text: #111827;
+        --color-text-muted: #6b7280;
+        --color-brand: #6366f1;
+      }
+      .dark {
+        --color-bg: #0f172a;
+        --color-surface: #1e293b;
+        --color-border: #334155;
+        --color-text: #f1f5f9;
+        --color-text-muted: #94a3b8;
+        --color-brand: #818cf8;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--color-bg);
+        color: var(--color-text);
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        min-height: 100vh;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100 min-h-screen">
+    <header class="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+          <!-- Logo -->
+          <a href="/" class="flex items-center gap-2 font-bold text-xl text-brand dark:text-indigo-400 hover:opacity-80 transition-opacity">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.16.09-.34.13-.52.13s-.36-.04-.52-.13l-7.9-4.44A.991.991 0 012 16.5v-9c0-.38.21-.71.53-.88l7.9-4.44c.32-.18.72-.18 1.04 0l7.9 4.44c.32.17.53.5.53.88v9z"/>
+            </svg>
+            DockUp
+          </a>
+
+          <!-- Nav -->
+          <nav class="flex items-center gap-1">
+            {navLinks.map(link => (
+              <a
+                href={link.href}
+                class={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentPath === link.href
+                    ? 'bg-indigo-50 dark:bg-indigo-900/40 text-brand dark:text-indigo-400'
+                    : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                {link.label}
+              </a>
+            ))}
+            <a
+              href="/clients/new"
+              class="ml-2 px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+            >
+              + Add Client
+            </a>
+            <div class="ml-2">
+              <!-- ThemeToggle placeholder — implemented in ThemeToggle.astro -->
+              <button
+                id="theme-toggle"
+                class="p-2 rounded-md text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Toggle theme"
+                title="Toggle theme"
+              >
+                <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+                <svg id="icon-monitor" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+              </button>
+            </div>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <slot />
+    </main>
+
+    <script>
+      (function() {
+        const themes = ['system', 'light', 'dark'];
+        const icons = { light: 'sun', dark: 'moon', system: 'monitor' };
+
+        function getTheme() {
+          return localStorage.getItem('dockup-theme') || 'system';
+        }
+
+        function applyIcons(theme) {
+          document.getElementById('icon-sun').classList.add('hidden');
+          document.getElementById('icon-moon').classList.add('hidden');
+          document.getElementById('icon-monitor').classList.add('hidden');
+          document.getElementById('icon-' + icons[theme]).classList.remove('hidden');
+        }
+
+        function applyTheme(theme) {
+          const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', isDark);
+          applyIcons(theme);
+        }
+
+        const btn = document.getElementById('theme-toggle');
+        if (btn) {
+          applyIcons(getTheme());
+          btn.addEventListener('click', function() {
+            const current = getTheme();
+            const next = themes[(themes.indexOf(current) + 1) % themes.length];
+            localStorage.setItem('dockup-theme', next);
+            applyTheme(next);
+          });
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+          if (getTheme() === 'system') applyTheme('system');
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,171 @@
+---
+export interface Props {
+  clientId: string;
+}
+
+const { clientId } = Astro.props;
+
+const apiBase =
+  import.meta.env.PUBLIC_API_URL ||
+  process.env.PUBLIC_API_URL ||
+  'http://localhost:3101';
+
+// Convert http(s):// to ws(s)://
+const wsBase = apiBase.replace(/^http/, 'ws');
+---
+
+<div
+  id="job-stream-panel"
+  data-client-id={clientId}
+  data-ws-base={wsBase}
+  class="fixed bottom-0 left-0 right-0 z-50 transform translate-y-full transition-transform duration-300 ease-in-out"
+  style="will-change: transform;"
+>
+  <div class="max-w-4xl mx-auto px-4 pb-4">
+    <div class="bg-gray-900 dark:bg-black rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
+      <!-- Panel header -->
+      <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <div class="flex items-center gap-2">
+          <span id="job-status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+          <span class="text-sm font-medium text-gray-100">Update in progress</span>
+          <span id="job-container-name" class="text-sm text-gray-400"></span>
+        </div>
+        <button
+          id="job-stream-dismiss"
+          class="text-gray-400 hover:text-white transition-colors text-lg leading-none px-2"
+          title="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Terminal output -->
+      <div
+        id="job-output"
+        class="font-mono text-xs text-green-400 bg-gray-950 p-4 h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed"
+      ></div>
+
+      <!-- Completion bar -->
+      <div id="job-complete-bar" class="hidden px-4 py-2 text-sm font-medium"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const panel = document.getElementById('job-stream-panel');
+    if (!panel) return;
+
+    const wsBase = panel.dataset.wsBase || 'ws://localhost:3101';
+    const output = document.getElementById('job-output')!;
+    const statusDot = document.getElementById('job-status-dot')!;
+    const containerNameEl = document.getElementById('job-container-name')!;
+    const completeBar = document.getElementById('job-complete-bar')!;
+    const dismissBtn = document.getElementById('job-stream-dismiss')!;
+
+    let currentJobId: string | null = null;
+
+    function show() {
+      panel.style.transform = 'translateY(0)';
+    }
+
+    function hide() {
+      panel.style.transform = 'translateY(100%)';
+    }
+
+    function appendOutput(text: string) {
+      output.textContent += text;
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function setComplete(success: boolean) {
+      statusDot.classList.remove('animate-pulse', 'bg-amber-400');
+      statusDot.classList.add(success ? 'bg-green-400' : 'bg-red-400');
+      completeBar.classList.remove('hidden');
+      completeBar.className =
+        'px-4 py-2 text-sm font-medium ' +
+        (success
+          ? 'bg-green-900/40 text-green-400 border-t border-green-800'
+          : 'bg-red-900/40 text-red-400 border-t border-red-800');
+      completeBar.textContent = success ? 'Update completed successfully.' : 'Update failed.';
+    }
+
+    function resetPanel() {
+      output.textContent = '';
+      statusDot.className = 'inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+      completeBar.className = 'hidden';
+      completeBar.textContent = '';
+      containerNameEl.textContent = '';
+      currentJobId = null;
+    }
+
+    dismissBtn.addEventListener('click', () => {
+      hide();
+      setTimeout(resetPanel, 400);
+    });
+
+    // Connect to UI WebSocket
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let backoff = 1000;
+
+    function connect() {
+      try {
+        ws = new WebSocket(`${wsBase}/api/ws/ui`);
+      } catch(e) {
+        scheduleReconnect();
+        return;
+      }
+
+      ws.onopen = () => {
+        backoff = 1000;
+      };
+
+      ws.onmessage = (event) => {
+        let msg: any;
+        try { msg = JSON.parse(event.data); } catch { return; }
+
+        switch(msg.type) {
+          case 'JobProgress': {
+            const { job_id, chunk } = msg.data;
+            if (!currentJobId) {
+              currentJobId = job_id;
+              resetPanel();
+              currentJobId = job_id;
+              show();
+            }
+            if (job_id === currentJobId) {
+              appendOutput(chunk);
+            }
+            break;
+          }
+          case 'JobComplete': {
+            const { job_id, success } = msg.data;
+            if (job_id === currentJobId) {
+              setComplete(success);
+            }
+            break;
+          }
+          case 'ContainerUpdate': {
+            // Could refresh container grid — for now just log
+            break;
+          }
+        }
+      };
+
+      ws.onclose = () => { scheduleReconnect(); };
+      ws.onerror  = () => { ws?.close(); };
+    }
+
+    function scheduleReconnect() {
+      if (reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        backoff = Math.min(backoff * 2, 30000);
+        connect();
+      }, backoff);
+    }
+
+    connect();
+  })();
+</script>

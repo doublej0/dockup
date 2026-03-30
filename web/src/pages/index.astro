@@ -1,0 +1,102 @@
+---
+import Layout from '../components/Layout.astro';
+import ClientCard from '../components/ClientCard.astro';
+import { getClients, getContainers } from '../lib/api';
+
+let clients = [];
+let fetchError = '';
+
+try {
+  clients = await getClients();
+} catch (e: any) {
+  fetchError = e.message;
+}
+
+// Fetch containers for each client and compute summaries
+const summaries: Record<string, { running: number; updatesAvailable: number }> = {};
+
+await Promise.all(
+  clients.map(async (client) => {
+    try {
+      const containers = await getContainers(client.id, true);
+      summaries[client.id] = {
+        running: containers.filter(c => c.status === 'running').length,
+        updatesAvailable: containers.filter(c => c.update_available).length,
+      };
+    } catch {
+      summaries[client.id] = { running: 0, updatesAvailable: 0 };
+    }
+  })
+);
+
+const totalClients = clients.length;
+const connectedClients = clients.filter(c => c.connected).length;
+const totalUpdates = Object.values(summaries).reduce((acc, s) => acc + s.updatesAvailable, 0);
+const totalContainers = Object.values(summaries).reduce((acc, s) => acc + s.running, 0);
+---
+
+<Layout title="Dashboard">
+  <!-- Summary stats -->
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-6">Dashboard</h1>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <p class="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Clients</p>
+        <p class="text-3xl font-bold text-gray-900 dark:text-slate-100 mt-1">{totalClients}</p>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <p class="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Connected</p>
+        <p class="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">{connectedClients}</p>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <p class="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Containers</p>
+        <p class="text-3xl font-bold text-gray-900 dark:text-slate-100 mt-1">{totalContainers}</p>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <p class="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Updates Available</p>
+        <p class={`text-3xl font-bold mt-1 ${totalUpdates > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-slate-500'}`}>
+          {totalUpdates}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error state -->
+  {fetchError && (
+    <div class="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+      <strong>Failed to load clients:</strong> {fetchError}
+    </div>
+  )}
+
+  <!-- Client grid -->
+  {clients.length > 0 ? (
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Clients</h2>
+        <a href="/clients/new" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">+ Add client</a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {clients.map(client => (
+          <ClientCard client={client} containerSummary={summaries[client.id] ?? { running: 0, updatesAvailable: 0 }} />
+        ))}
+      </div>
+    </div>
+  ) : !fetchError ? (
+    <div class="text-center py-24">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-50 dark:bg-indigo-900/30 mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.16.09-.34.13-.52.13s-.36-.04-.52-.13l-7.9-4.44A.991.991 0 012 16.5v-9c0-.38.21-.71.53-.88l7.9-4.44c.32-.18.72-.18 1.04 0l7.9 4.44c.32.17.53.5.53.88v9z"/>
+        </svg>
+      </div>
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-2">No clients yet</h2>
+      <p class="text-gray-500 dark:text-slate-400 mb-6">Add your first Docker host to get started.</p>
+      <a
+        href="/clients/new"
+        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition-colors"
+      >
+        Add your first client
+      </a>
+    </div>
+  ) : null}
+</Layout>

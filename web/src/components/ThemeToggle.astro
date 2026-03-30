@@ -1,0 +1,78 @@
+---
+// ThemeToggle: three-state light / dark / system toggle
+// Designed to be used standalone if needed outside Layout
+---
+
+<button
+  id="theme-toggle-btn"
+  class="inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors border border-gray-200 dark:border-slate-600"
+  aria-label="Toggle colour scheme"
+  title="Toggle colour scheme"
+>
+  <svg id="tt-sun" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="5"/>
+    <line x1="12" y1="1" x2="12" y2="3"/>
+    <line x1="12" y1="21" x2="12" y2="23"/>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+    <line x1="1" y1="12" x2="3" y2="12"/>
+    <line x1="21" y1="12" x2="23" y2="12"/>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+  <svg id="tt-moon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+  <svg id="tt-monitor" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+    <line x1="8" y1="21" x2="16" y2="21"/>
+    <line x1="12" y1="17" x2="12" y2="21"/>
+  </svg>
+  <span id="tt-label" class="sr-only">Toggle theme</span>
+</button>
+
+<script>
+  (function () {
+    const THEMES = ['system', 'light', 'dark'] as const;
+    type Theme = typeof THEMES[number];
+
+    const ICONS: Record<Theme, string> = { light: 'sun', dark: 'moon', system: 'monitor' };
+    const LABELS: Record<Theme, string> = { light: 'Light', dark: 'Dark', system: 'System' };
+
+    function getTheme(): Theme {
+      return (localStorage.getItem('dockup-theme') as Theme) || 'system';
+    }
+
+    function render(theme: Theme) {
+      for (const t of THEMES) {
+        const el = document.getElementById('tt-' + ICONS[t]);
+        if (el) el.classList.toggle('hidden', ICONS[t] !== ICONS[theme]);
+      }
+      const label = document.getElementById('tt-label');
+      if (label) label.textContent = LABELS[theme];
+    }
+
+    function applyDark(theme: Theme) {
+      const isDark =
+        theme === 'dark' ||
+        (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', isDark);
+    }
+
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) {
+      render(getTheme());
+      btn.addEventListener('click', () => {
+        const current = getTheme();
+        const next = THEMES[(THEMES.indexOf(current) + 1) % THEMES.length];
+        localStorage.setItem('dockup-theme', next);
+        render(next);
+        applyDark(next);
+      });
+    }
+
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (getTheme() === 'system') applyDark('system');
+    });
+  })();
+</script>

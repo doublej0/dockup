@@ -1,0 +1,238 @@
+---
+import type { Container } from '../lib/api';
+
+export interface Props {
+  containers: Container[];
+  clientId: string;
+}
+
+const { containers, clientId } = Astro.props;
+
+const apiBase =
+  import.meta.env.PUBLIC_API_URL ||
+  process.env.PUBLIC_API_URL ||
+  'http://localhost:3101';
+
+function statusBadgeClass(status: string) {
+  if (status === 'running') return 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400';
+  if (status === 'exited' || status === 'dead') return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400';
+  return 'bg-gray-100 dark:bg-slate-600 text-gray-600 dark:text-slate-300';
+}
+
+function modeBadgeClass(mode: string) {
+  if (mode === 'auto') return 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400';
+  return 'bg-gray-100 dark:bg-slate-600 text-gray-500 dark:text-slate-300';
+}
+---
+
+<div id="container-grid-root" data-client-id={clientId} data-api-base={apiBase}>
+  <!-- Controls bar -->
+  <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300 cursor-pointer">
+        <input
+          id="show-stopped-toggle"
+          type="checkbox"
+          class="rounded border-gray-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+        />
+        Show stopped
+      </label>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        id="update-selected-btn"
+        class="hidden px-3 py-1.5 rounded-md text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
+        disabled
+      >
+        Update selected
+      </button>
+      <button
+        id="update-all-available-btn"
+        class="px-3 py-1.5 rounded-md text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+      >
+        Update all available
+      </button>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div id="container-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {containers.map(container => (
+      <div
+        class={`bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm p-4 transition-shadow hover:shadow-md ${
+          container.status !== 'running' ? 'container-stopped opacity-60' : ''
+        }`}
+        data-container-name={container.container_name}
+        data-status={container.status}
+        data-update-available={container.update_available ? 'true' : 'false'}
+        data-image={container.image}
+      >
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <input
+              type="checkbox"
+              class="container-checkbox rounded border-gray-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 flex-shrink-0"
+              data-name={container.container_name}
+            />
+            <h3 class="text-sm font-semibold truncate" title={container.container_name}>
+              {container.container_name}
+            </h3>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadgeClass(container.status)}`}>
+              {container.status}
+            </span>
+          </div>
+        </div>
+
+        <p class="mt-2 text-xs text-gray-500 dark:text-slate-400 truncate" title={container.image}>
+          {container.image}
+        </p>
+
+        <div class="mt-3 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1">
+            <span class={`text-xs px-2 py-0.5 rounded-full ${modeBadgeClass(container.update_mode)}`}>
+              {container.update_mode}
+            </span>
+            {container.update_available && (
+              <span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                update
+              </span>
+            )}
+          </div>
+
+          <button
+            class="update-single-btn text-xs px-2.5 py-1 rounded-md font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors disabled:opacity-50"
+            data-name={container.container_name}
+          >
+            Update
+          </button>
+        </div>
+
+        {container.checked_at && (
+          <p class="mt-2 text-xs text-gray-400 dark:text-slate-500">
+            Checked: <span class="checked-at-ts" data-ts={container.checked_at}>{container.checked_at}</span>
+          </p>
+        )}
+      </div>
+    ))}
+  </div>
+
+  {containers.length === 0 && (
+    <div class="text-center py-12 text-gray-400 dark:text-slate-500">
+      <p class="text-lg">No containers found</p>
+      <p class="text-sm mt-1">The agent may still be connecting or no containers are running.</p>
+    </div>
+  )}
+</div>
+
+<script>
+  (function() {
+    const root = document.getElementById('container-grid-root');
+    if (!root) return;
+
+    const clientId = root.dataset.clientId!;
+    const apiBase = root.dataset.apiBase || 'http://localhost:3101';
+
+    // Localise timestamps
+    document.querySelectorAll<HTMLElement>('.checked-at-ts').forEach(el => {
+      const ts = el.dataset.ts;
+      if (!ts) return;
+      try {
+        el.textContent = new Intl.DateTimeFormat(undefined, {
+          dateStyle: 'short',
+          timeStyle: 'short',
+        }).format(new Date(ts));
+      } catch { /* leave as-is */ }
+    });
+
+    // Show/hide stopped containers
+    const stopToggle = document.getElementById('show-stopped-toggle') as HTMLInputElement;
+    stopToggle?.addEventListener('change', () => {
+      document.querySelectorAll<HTMLElement>('.container-stopped').forEach(el => {
+        el.style.display = stopToggle.checked ? '' : 'none';
+      });
+    });
+    // Hide stopped by default
+    document.querySelectorAll<HTMLElement>('.container-stopped').forEach(el => {
+      el.style.display = 'none';
+    });
+
+    // Checkbox selection
+    const updateSelectedBtn = document.getElementById('update-selected-btn') as HTMLButtonElement;
+    function updateSelectionState() {
+      const checked = document.querySelectorAll<HTMLInputElement>('.container-checkbox:checked');
+      if (checked.length > 0) {
+        updateSelectedBtn.classList.remove('hidden');
+        updateSelectedBtn.disabled = false;
+        updateSelectedBtn.textContent = `Update selected (${checked.length})`;
+      } else {
+        updateSelectedBtn.classList.add('hidden');
+        updateSelectedBtn.disabled = true;
+      }
+    }
+    document.querySelectorAll('.container-checkbox').forEach(cb => {
+      cb.addEventListener('change', updateSelectionState);
+    });
+
+    // Trigger update helper
+    async function triggerUpdate(names?: string[], all?: boolean) {
+      const body: Record<string, unknown> = {};
+      if (names) body.container_names = names;
+      if (all) body.all = true;
+      const res = await fetch(`${apiBase}/api/clients/${clientId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    // Update selected
+    updateSelectedBtn?.addEventListener('click', async () => {
+      const names = Array.from(
+        document.querySelectorAll<HTMLInputElement>('.container-checkbox:checked')
+      ).map(cb => cb.dataset.name!);
+      updateSelectedBtn.disabled = true;
+      updateSelectedBtn.textContent = 'Triggering…';
+      try {
+        await triggerUpdate(names);
+        updateSelectedBtn.textContent = 'Triggered!';
+      } catch(e) {
+        updateSelectedBtn.textContent = 'Failed';
+        updateSelectedBtn.disabled = false;
+      }
+    });
+
+    // Update all available
+    const updateAllBtn = document.getElementById('update-all-available-btn') as HTMLButtonElement;
+    updateAllBtn?.addEventListener('click', async () => {
+      updateAllBtn.disabled = true;
+      updateAllBtn.textContent = 'Triggering…';
+      try {
+        await triggerUpdate(undefined, true);
+        updateAllBtn.textContent = 'Triggered!';
+      } catch(e) {
+        updateAllBtn.textContent = 'Failed';
+        updateAllBtn.disabled = false;
+      }
+    });
+
+    // Update single container
+    document.querySelectorAll<HTMLButtonElement>('.update-single-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.name!;
+        btn.disabled = true;
+        btn.textContent = '…';
+        try {
+          await triggerUpdate([name]);
+          btn.textContent = 'Triggered!';
+        } catch(e) {
+          btn.textContent = 'Failed';
+          btn.disabled = false;
+        }
+      });
+    });
+  })();
+</script>

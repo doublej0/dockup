@@ -1,0 +1,45 @@
+name: dockup
+
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: dockup-api
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:///data/dockup.db
+      - DOCKUP_PUBLIC_API_URL=${DOCKUP_PUBLIC_API_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - RUST_LOG=info
+    volumes:
+      - ./data:/data
+    ports:
+      - "3101:3101"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: dockup-web
+    restart: unless-stopped
+    environment:
+      - PORT=3100
+      - HOST=0.0.0.0
+      - PUBLIC_API_URL=${DOCKUP_PUBLIC_API_URL}
+    ports:
+      - "3100:3100"
+    depends_on:
+      - api
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes: {}

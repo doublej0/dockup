@@ -1,0 +1,193 @@
+---
+import Layout from '../../components/Layout.astro';
+import ContainerGrid from '../../components/ContainerGrid.astro';
+import UpdateJobStream from '../../components/UpdateJobStream.astro';
+import { getClient, getContainers } from '../../lib/api';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/clients');
+}
+
+let client = null;
+let containers = [];
+let fetchError = '';
+
+try {
+  client = await getClient(id);
+  containers = await getContainers(id, true);
+} catch (e: any) {
+  fetchError = e.message;
+}
+
+const apiBase =
+  import.meta.env.PUBLIC_API_URL ||
+  process.env.PUBLIC_API_URL ||
+  'http://localhost:3101';
+---
+
+<Layout title={client?.name ?? 'Client'}>
+  <div class="mb-4">
+    <a href="/clients" class="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200">← Back to clients</a>
+  </div>
+
+  {fetchError && (
+    <div class="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+      <strong>Error:</strong> {fetchError}
+    </div>
+  )}
+
+  {client && (
+    <>
+      <!-- Client header -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl border-l-4 border border-gray-200 dark:border-slate-700 shadow-sm p-6 mb-6"
+        style={`border-left-color: ${client.color}`}
+      >
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span
+                class={`inline-block w-2.5 h-2.5 rounded-full ${client.connected ? 'bg-green-400' : 'bg-gray-300 dark:bg-slate-600'}`}
+              ></span>
+              <h1 class="text-xl font-bold text-gray-900 dark:text-slate-100">{client.name}</h1>
+              <span class="text-sm text-gray-400 dark:text-slate-500">{client.connected ? 'Online' : 'Offline'}</span>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-slate-400 font-mono">{client.host}</p>
+            {client.agent_version && (
+              <p class="text-xs text-gray-400 dark:text-slate-500 mt-1">Agent v{client.agent_version}</p>
+            )}
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              id="edit-client-btn"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              id="delete-client-btn"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              data-client-id={client.id}
+              data-client-name={client.name}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <!-- Edit form (hidden by default) -->
+        <div id="edit-form" class="hidden mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
+          <form id="client-edit-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Name</label>
+              <input
+                name="name"
+                type="text"
+                value={client.name}
+                class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Color</label>
+              <input
+                name="color"
+                type="color"
+                value={client.color}
+                class="h-10 w-20 rounded-lg border border-gray-300 dark:border-slate-600 cursor-pointer"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Compose file path</label>
+              <input
+                name="compose_file_path"
+                type="text"
+                value={client.compose_file_path ?? ''}
+                class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Agent update mode</label>
+              <select
+                name="agent_update_mode"
+                class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="manual" selected={client.agent_update_mode === 'manual'}>Manual</option>
+                <option value="auto" selected={client.agent_update_mode === 'auto'}>Auto</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2 flex items-center gap-2">
+              <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+                Save
+              </button>
+              <button type="button" id="cancel-edit-btn" class="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Containers -->
+      <div class="mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">Containers</h2>
+        <ContainerGrid containers={containers} clientId={client.id} />
+      </div>
+
+      <UpdateJobStream clientId={client.id} />
+    </>
+  )}
+</Layout>
+
+<script define:vars={{ apiBase, clientId: id }}>
+  (function() {
+    const editBtn = document.getElementById('edit-client-btn');
+    const editForm = document.getElementById('edit-form');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    const clientEditForm = document.getElementById('client-edit-form');
+    const deleteBtn = document.getElementById('delete-client-btn');
+
+    editBtn?.addEventListener('click', () => {
+      editForm.classList.toggle('hidden');
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+      editForm.classList.add('hidden');
+    });
+
+    clientEditForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(clientEditForm);
+      const data = {
+        name: fd.get('name'),
+        color: fd.get('color'),
+        compose_file_path: fd.get('compose_file_path') || null,
+        agent_update_mode: fd.get('agent_update_mode'),
+      };
+      try {
+        const res = await fetch(`${apiBase}/api/clients/${clientId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        window.location.reload();
+      } catch(err) {
+        alert(`Failed to update client: ${err.message}`);
+      }
+    });
+
+    deleteBtn?.addEventListener('click', async () => {
+      const name = deleteBtn.dataset.clientName;
+      if (!confirm(`Delete client "${name}"? This will also remove all container and job records.`)) return;
+      try {
+        const res = await fetch(`${apiBase}/api/clients/${clientId}`, { method: 'DELETE' });
+        if (!res.ok && res.status !== 204) throw new Error(await res.text());
+        window.location.href = '/clients';
+      } catch(err) {
+        alert(`Failed to delete: ${err.message}`);
+      }
+    });
+  })();
+</script>

@@ -1,0 +1,77 @@
+name: Agent Release
+
+on:
+  push:
+    tags:
+      - 'agent-v*'
+
+jobs:
+  build:
+    name: Build agent (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            artifact_name: dockup-agent-x86_64
+          - target: aarch64-unknown-linux-gnu
+            artifact_name: dockup-agent-aarch64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88.0"
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build agent
+        working-directory: agent
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Rename binary
+        run: |
+          cp agent/target/${{ matrix.target }}/release/dockup-agent ${{ matrix.artifact_name }}
+
+      - name: Compute SHA256
+        run: |
+          sha256sum ${{ matrix.artifact_name }} > ${{ matrix.artifact_name }}.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.artifact_name }}
+            ${{ matrix.artifact_name }}.sha256
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dockup-agent-x86_64/dockup-agent-x86_64
+            dockup-agent-x86_64/dockup-agent-x86_64.sha256
+            dockup-agent-aarch64/dockup-agent-aarch64
+            dockup-agent-aarch64/dockup-agent-aarch64.sha256
+          generate_release_notes: true

@@ -2,6 +2,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+pub const AGENT_VERSION: &str = "0.1.0";
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentConfig {
     pub server_url: String,

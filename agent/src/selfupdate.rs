@@ -47,11 +47,11 @@ pub async fn perform_update(version: &str, arch: &str) -> Result<()> {
         .build()?;
 
     let binary_url = format!(
-        "https://github.com/doublej0/dockup/releases/download/agent-{}/dockup-agent-{}",
+        "https://github.com/doublej0/dockup/releases/download/agent-v{}/dockup-agent-{}",
         version, arch
     );
     let checksum_url = format!(
-        "https://github.com/doublej0/dockup/releases/download/agent-{}/dockup-agent-{}.sha256",
+        "https://github.com/doublej0/dockup/releases/download/agent-v{}/dockup-agent-{}.sha256",
         version, arch
     );
 

@@ -7,7 +7,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::{
-    config::AgentConfig,
+    config::{AgentConfig, AGENT_VERSION},
     docker,
     registry::RegistryChecker,
     updater,
@@ -55,7 +55,6 @@ pub struct ContainerInfo {
     pub status: String,
 }
 
-const AGENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub async fn run_agent_loop(config: AgentConfig) {
     let mut backoff_secs: u64 = 1;

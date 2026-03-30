@@ -90,6 +90,7 @@ pub async fn list_all_containers() -> Result<Vec<ContainerInfo>> {
     Ok(result)
 }
 
+#[allow(dead_code)]
 pub async fn pull_image(image: &str) -> Result<()> {
     info!("Pulling image: {}", image);
     let docker = get_docker()?;

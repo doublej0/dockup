@@ -27,6 +27,9 @@ yarn-error.log*
 # Data directory
 data/
 
+# Agent binaries (compiled artifacts, copied into Docker build context)
+api/agent-binaries/
+
 # OS
 .DS_Store
 Thumbs.db

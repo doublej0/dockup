@@ -81,12 +81,19 @@ pub async fn list_all_containers() -> Result<Vec<ContainerInfo>> {
                 .unwrap_or_default()
                 .trim_start_matches('/')
                 .to_string();
-            ContainerInfo {
+            let info = ContainerInfo {
                 container_name: name,
                 image: c.image.unwrap_or_default(),
                 status: parse_status(c.state.as_deref()),
                 image_id: c.image_id,
-            }
+            };
+            tracing::debug!(
+                "Container {} image={} image_id={:?}",
+                info.container_name,
+                info.image,
+                info.image_id
+            );
+            info
         })
         .collect();
 

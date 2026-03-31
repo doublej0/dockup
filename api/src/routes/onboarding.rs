@@ -77,7 +77,7 @@ pub async fn onboard_client(
         };
 
         // Create config directory
-        run_ssh_command(&sess, "sudo mkdir -p /etc/dockup-agent")?;
+        run_ssh_sudo_command(&sess, "sudo mkdir -p /etc/dockup-agent", &ssh_password)?;
         info!("Created config directory");
 
         // Write config file
@@ -97,6 +97,7 @@ pub async fn onboard_client(
             "/etc/dockup-agent/config.toml",
             config_content.as_bytes(),
             true,
+            &ssh_password,
         )?;
         info!("Wrote agent config");
 
@@ -108,8 +109,8 @@ pub async fn onboard_client(
             "sudo curl -fsSL -o /usr/local/bin/dockup-agent '{}'",
             binary_url
         );
-        run_ssh_command(&sess, &download_cmd)?;
-        run_ssh_command(&sess, "sudo chmod +x /usr/local/bin/dockup-agent")?;
+        run_ssh_sudo_command(&sess, &download_cmd, &ssh_password)?;
+        run_ssh_sudo_command(&sess, "sudo chmod +x /usr/local/bin/dockup-agent", &ssh_password)?;
         info!("Agent binary installed");
 
         // Write systemd service
@@ -135,13 +136,14 @@ WantedBy=multi-user.target
             "/etc/systemd/system/dockup-agent.service",
             service_content.as_bytes(),
             true,
+            &ssh_password,
         )?;
         info!("Wrote systemd service file");
 
         // Enable and start service
-        run_ssh_command(&sess, "sudo systemctl daemon-reload")?;
-        run_ssh_command(&sess, "sudo systemctl enable dockup-agent")?;
-        run_ssh_command(&sess, "sudo systemctl restart dockup-agent")?;
+        run_ssh_sudo_command(&sess, "sudo systemctl daemon-reload", &ssh_password)?;
+        run_ssh_sudo_command(&sess, "sudo systemctl enable dockup-agent", &ssh_password)?;
+        run_ssh_sudo_command(&sess, "sudo systemctl restart dockup-agent", &ssh_password)?;
         info!("Started dockup-agent service");
 
         // SSH credentials are dropped here as the closure ends
@@ -242,6 +244,10 @@ WantedBy=multi-user.target
     }
 }
 
+fn shell_escape(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
 fn run_ssh_command(sess: &Session, cmd: &str) -> anyhow::Result<String> {
     let mut channel = sess.channel_session()?;
     channel.exec(cmd)?;
@@ -268,11 +274,18 @@ fn run_ssh_command(sess: &Session, cmd: &str) -> anyhow::Result<String> {
     Ok(output)
 }
 
+fn run_ssh_sudo_command(sess: &Session, cmd: &str, sudo_pass: &str) -> anyhow::Result<String> {
+    let inner_cmd = cmd.trim_start().strip_prefix("sudo ").unwrap_or(cmd.trim_start());
+    let wrapped = format!("echo {} | sudo -S {}", shell_escape(sudo_pass), inner_cmd);
+    run_ssh_command(sess, &wrapped)
+}
+
 fn write_file_via_ssh(
     sess: &Session,
     remote_path: &str,
     content: &[u8],
     use_sudo: bool,
+    sudo_pass: &str,
 ) -> anyhow::Result<()> {
     if use_sudo {
         // Write to a temp file then move with sudo
@@ -290,7 +303,7 @@ fn write_file_via_ssh(
             channel.close()?;
             channel.wait_close()?;
         }
-        run_ssh_command(sess, &format!("sudo mv {} {}", tmp_path, remote_path))?;
+        run_ssh_sudo_command(sess, &format!("sudo mv {} {}", tmp_path, remote_path), sudo_pass)?;
     } else {
         let mut channel = sess.scp_send(
             std::path::Path::new(remote_path),

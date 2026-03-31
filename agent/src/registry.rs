@@ -7,7 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use reqwest::header;
 use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 pub struct VersionCheckResult {
     pub latest_digest: String,
@@ -144,7 +144,7 @@ impl RegistryChecker {
             Ok(digest.to_str()?.to_string())
         } else {
             // Fallback: use Hub API to get digest
-            warn!("No Docker-Content-Digest header for {}", repo);
+            debug!("No Docker-Content-Digest header for {}", repo);
             let hub_url = format!(
                 "https://hub.docker.com/v2/repositories/{}/tags/{}",
                 repo, tag

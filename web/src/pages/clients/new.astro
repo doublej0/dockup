@@ -131,7 +131,7 @@ try {
             <button
               type="button"
               class="color-swatch w-7 h-7 rounded-full transition-transform focus:outline-none"
-              style={`background-color: ${color}`}
+              style={`background-color: ${color}${usedColors[color.toLowerCase()] ? '; opacity: 0.35' : ''}`}
               data-color={color}
               title={color}
             ></button>
@@ -185,7 +185,7 @@ try {
       colorHiddenInput.value = color;
       document.querySelectorAll('.color-swatch').forEach(sw => {
         if (sw.dataset.color === color) {
-          sw.style.boxShadow = `0 0 0 3px ${color}`;
+          sw.style.boxShadow = `0 0 0 2px #0f172a, 0 0 0 5px ${color}`;
           sw.style.transform = 'scale(1.15)';
         } else {
           sw.style.boxShadow = '';

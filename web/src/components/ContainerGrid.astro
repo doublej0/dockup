@@ -24,6 +24,12 @@ function modeBadgeClass(mode: string) {
   if (mode === 'auto') return 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400';
   return 'bg-gray-100 dark:bg-slate-600 text-gray-500 dark:text-slate-300';
 }
+
+function truncateDigest(digest: string): string {
+  if (!digest) return '';
+  const hash = digest.startsWith('sha256:') ? digest.slice(7) : digest;
+  return hash.slice(0, 8);
+}
 ---
 
 <div id="container-grid-root" data-client-id={clientId} data-api-base={apiBase}>
@@ -91,6 +97,23 @@ function modeBadgeClass(mode: string) {
         <p class="mt-2 text-xs text-gray-500 dark:text-slate-400 truncate" title={container.image}>
           {container.image}
         </p>
+
+        {container.latest_digest && !container.current_digest && (
+          <p class="mt-1 text-xs text-slate-400 dark:text-slate-500 font-mono truncate">
+            latest: {truncateDigest(container.latest_digest)}
+          </p>
+        )}
+        {container.current_digest && container.latest_digest && container.current_digest === container.latest_digest && (
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-500 font-mono truncate">
+            {truncateDigest(container.current_digest)}
+          </p>
+        )}
+        {container.current_digest && container.latest_digest && container.current_digest !== container.latest_digest && (
+          <p class="mt-1 text-xs font-mono">
+            <span class="text-slate-500">{truncateDigest(container.current_digest)}</span>
+            <span class="text-amber-400"> → {truncateDigest(container.latest_digest)}</span>
+          </p>
+        )}
 
         <div class="mt-3 flex items-center justify-between gap-2">
           <div class="flex items-center gap-1">

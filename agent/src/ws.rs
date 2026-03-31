@@ -3,7 +3,7 @@ use std::time::Duration;
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -215,10 +215,20 @@ async fn handle_server_message(
                         .await;
                     }
                     Err(e) => {
-                        warn!(
-                            "Failed to check version for {}: {}",
-                            container.container_name, e
-                        );
+                        let err_str = e.to_string();
+                        if err_str.contains("404") || err_str.contains("not found")
+                            || err_str.contains("Could not determine digest")
+                            || err_str.contains("returned status 404") {
+                            debug!(
+                                "Container {} uses a locally-built image, skipping version check",
+                                container.container_name
+                            );
+                        } else {
+                            warn!(
+                                "Failed to check version for {}: {}",
+                                container.container_name, e
+                            );
+                        }
                     }
                 }
             }

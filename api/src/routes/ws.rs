@@ -207,6 +207,13 @@ async fn handle_agent_message(state: &AppState, client_id: &str, text: &str) {
                 client_id,
                 containers.len()
             );
+            // Use the client's agent_update_mode as the default for newly inserted containers.
+            // On conflict the UPDATE SET intentionally omits update_mode, so existing
+            // user-set values are preserved.
+            let default_update_mode = match db::get_client(&state.db, client_id).await {
+                Ok(Some(ref c)) => c.agent_update_mode.clone(),
+                _ => "manual".to_string(),
+            };
             for info_item in containers {
                 let container = Container {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -216,7 +223,7 @@ async fn handle_agent_message(state: &AppState, client_id: &str, text: &str) {
                     current_digest: None,
                     latest_digest: None,
                     update_available: false,
-                    update_mode: "manual".to_string(),
+                    update_mode: default_update_mode.clone(),
                     status: info_item.status.clone(),
                     checked_at: None,
                 };

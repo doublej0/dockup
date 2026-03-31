@@ -1,5 +1,6 @@
 ---
 import Layout from '../../components/Layout.astro';
+import { getClients } from '../../lib/api';
 
 const apiBase =
   import.meta.env.PUBLIC_API_URL ||
@@ -16,6 +17,14 @@ const PRESET_COLORS = [
   '#ec4899', // pink
   '#64748b', // slate
 ];
+
+let usedColors: Record<string, string> = {};
+try {
+  const clients = await getClients();
+  usedColors = Object.fromEntries(clients.map(c => [c.color.toLowerCase(), c.name]));
+} catch {
+  // non-fatal — color warnings are best-effort
+}
 ---
 
 <Layout title="Add Client">
@@ -113,11 +122,15 @@ const PRESET_COLORS = [
       <!-- Color picker -->
       <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Color</label>
-        <div class="flex items-center gap-2 flex-wrap">
+        <div
+          id="color-picker-swatches"
+          class="flex items-center gap-2 flex-wrap"
+          data-used-colors={JSON.stringify(usedColors)}
+        >
           {PRESET_COLORS.map(color => (
             <button
               type="button"
-              class="color-swatch w-7 h-7 rounded-full border-2 border-transparent hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              class="color-swatch w-7 h-7 rounded-full transition-transform focus:outline-none"
               style={`background-color: ${color}`}
               data-color={color}
               title={color}
@@ -130,6 +143,7 @@ const PRESET_COLORS = [
             title="Custom color"
           />
         </div>
+        <p id="color-in-use-warning" class="hidden mt-1.5 text-xs text-amber-400"></p>
         <input type="hidden" id="color" name="color" value={PRESET_COLORS[0]} />
       </div>
 
@@ -161,16 +175,31 @@ const PRESET_COLORS = [
   (function() {
     // Color picker logic
     const colorHiddenInput = document.getElementById('color');
+    const colorPickerSwatches = document.getElementById('color-picker-swatches');
+    const colorWarning = document.getElementById('color-in-use-warning');
+    const usedColors = JSON.parse(colorPickerSwatches.dataset.usedColors || '{}');
     let selectedColor = '#6366f1';
 
     function selectColor(color) {
       selectedColor = color;
       colorHiddenInput.value = color;
       document.querySelectorAll('.color-swatch').forEach(sw => {
-        const isSelected = sw.dataset.color === color;
-        sw.style.borderColor = isSelected ? '#1e293b' : 'transparent';
-        sw.style.transform = isSelected ? 'scale(1.2)' : '';
+        if (sw.dataset.color === color) {
+          sw.style.boxShadow = `0 0 0 3px ${color}`;
+          sw.style.transform = 'scale(1.15)';
+        } else {
+          sw.style.boxShadow = '';
+          sw.style.transform = '';
+        }
       });
+      // In-use warning
+      const usedBy = usedColors[color.toLowerCase()];
+      if (usedBy) {
+        colorWarning.textContent = `This color is already used by ${usedBy}`;
+        colorWarning.classList.remove('hidden');
+      } else {
+        colorWarning.classList.add('hidden');
+      }
     }
 
     // Select first color by default

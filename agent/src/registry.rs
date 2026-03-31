@@ -135,7 +135,7 @@ impl RegistryChecker {
             .bearer_auth(token)
             .header(
                 "Accept",
-                "application/vnd.docker.distribution.manifest.v2+json",
+                "application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json",
             )
             .send()
             .await?;
@@ -183,7 +183,7 @@ impl RegistryChecker {
             .head(&manifest_url)
             .header(
                 "Accept",
-                "application/vnd.docker.distribution.manifest.v2+json",
+                "application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json",
             )
             .send()
             .await;
@@ -199,7 +199,7 @@ impl RegistryChecker {
                         .get(&manifest_url)
                         .header(
                             "Accept",
-                            "application/vnd.docker.distribution.manifest.v2+json",
+                            "application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json",
                         )
                         .send()
                         .await?;
@@ -228,7 +228,7 @@ impl RegistryChecker {
                     .bearer_auth(&token)
                     .header(
                         "Accept",
-                        "application/vnd.docker.distribution.manifest.v2+json",
+                        "application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json",
                     )
                     .send()
                     .await?;

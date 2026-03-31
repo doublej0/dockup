@@ -107,7 +107,21 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/ws/ui", get(routes::ws::ui_ws_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(state);
+        .with_state(state.clone());
+
+    let hub_clone = state.hub.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(6 * 60 * 60));
+        interval.tick().await; // skip first tick — agents send on connect already
+        loop {
+            interval.tick().await;
+            let agent_ids = hub_clone.get_connected_agent_ids();
+            for id in agent_ids {
+                hub_clone.send_to_agent(&id, crate::models::ServerToAgent::CheckVersions).await;
+                tracing::info!("Periodic CheckVersions sent to agent {}", id);
+            }
+        }
+    });
 
     let addr = "0.0.0.0:3101";
     info!("Listening on {}", addr);

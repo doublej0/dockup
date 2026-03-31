@@ -77,6 +77,11 @@ impl WsHub {
         let mut agents = self.agents.lock().unwrap();
         agents.remove(client_id);
     }
+
+    pub fn get_connected_agent_ids(&self) -> Vec<String> {
+        let agents = self.agents.lock().unwrap();
+        agents.keys().cloned().collect()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -127,6 +132,10 @@ async fn handle_agent_socket(socket: WebSocket, state: AppState, client_id: Stri
     });
 
     info!("Agent connected: {}", client_id);
+
+    // Trigger immediate version check on connect
+    state.hub.send_to_agent(&client_id, crate::models::ServerToAgent::CheckVersions).await;
+    info!("Sent CheckVersions to agent {}", client_id);
 
     // Spawn task to forward commands to the WebSocket
     let forward_task = tokio::spawn(async move {

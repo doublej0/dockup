@@ -116,4 +116,5 @@ pub struct ContainerInfo {
     pub container_name: String,
     pub image: String,
     pub status: String,
+    pub image_id: Option<String>,
 }

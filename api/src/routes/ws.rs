@@ -220,7 +220,7 @@ async fn handle_agent_message(state: &AppState, client_id: &str, text: &str) {
                     client_id: client_id.to_string(),
                     container_name: info_item.container_name.clone(),
                     image: info_item.image.clone(),
-                    current_digest: None,
+                    current_digest: info_item.image_id.clone(),
                     latest_digest: None,
                     update_available: false,
                     update_mode: default_update_mode.clone(),

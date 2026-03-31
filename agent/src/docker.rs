@@ -9,6 +9,7 @@ pub struct ContainerInfo {
     pub container_name: String,
     pub image: String,
     pub status: String,
+    pub image_id: Option<String>,
 }
 
 fn get_docker() -> Result<Docker> {
@@ -51,6 +52,7 @@ pub async fn list_running_containers() -> Result<Vec<ContainerInfo>> {
                 container_name: name,
                 image: c.image.unwrap_or_default(),
                 status: parse_status(c.state.as_deref()),
+                image_id: c.image_id,
             }
         })
         .collect();
@@ -83,6 +85,7 @@ pub async fn list_all_containers() -> Result<Vec<ContainerInfo>> {
                 container_name: name,
                 image: c.image.unwrap_or_default(),
                 status: parse_status(c.state.as_deref()),
+                image_id: c.image_id,
             }
         })
         .collect();

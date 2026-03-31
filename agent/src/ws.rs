@@ -53,6 +53,7 @@ pub struct ContainerInfo {
     pub container_name: String,
     pub image: String,
     pub status: String,
+    pub image_id: Option<String>,
 }
 
 
@@ -199,7 +200,7 @@ async fn handle_server_message(
 
             for container in containers {
                 let result = registry
-                    .check_image(&container.image, None)
+                    .check_image(&container.image, container.image_id.as_deref())
                     .await;
                 match result {
                     Ok(check) => {
@@ -207,7 +208,7 @@ async fn handle_server_message(
                             out_tx,
                             AgentToServer::VersionCheckResult {
                                 container: container.container_name.clone(),
-                                current_digest: String::new(),
+                                current_digest: container.image_id.clone().unwrap_or_default(),
                                 latest_digest: check.latest_digest,
                                 update_available: check.update_available,
                             },
@@ -351,6 +352,7 @@ async fn send_container_list(out_tx: &mpsc::Sender<AgentToServer>) {
                     container_name: c.container_name,
                     image: c.image,
                     status: c.status,
+                    image_id: c.image_id,
                 })
                 .collect();
             info!("Sending container list: {} containers", list.len());

@@ -37,26 +37,27 @@ pub async fn list_running_containers() -> Result<Vec<ContainerInfo>> {
 
     let containers = docker.list_containers(Some(options)).await?;
 
-    let result = containers
-        .into_iter()
-        .map(|c| {
-            let name = c
-                .names
-                .unwrap_or_default()
-                .first()
-                .cloned()
-                .unwrap_or_default()
-                .trim_start_matches('/')
-                .to_string();
-            ContainerInfo {
-                container_name: name,
-                image: c.image.unwrap_or_default(),
-                status: parse_status(c.state.as_deref()),
-                image_id: c.image_id,
-            }
-        })
-        .collect();
-
+    let mut result = Vec::new();
+    for c in containers {
+        let name = c
+            .names
+            .unwrap_or_default()
+            .first()
+            .cloned()
+            .unwrap_or_default()
+            .trim_start_matches('/')
+            .to_string();
+        let image = c.image.unwrap_or_default();
+        let status = parse_status(c.state.as_deref());
+        let current_digest = get_image_repo_digest(&image).await;
+        tracing::debug!("Container {} image={} repo_digest={:?}", name, image, current_digest);
+        result.push(ContainerInfo {
+            container_name: name,
+            image,
+            status,
+            image_id: current_digest,
+        });
+    }
     Ok(result)
 }
 
@@ -65,46 +66,56 @@ pub async fn list_all_containers() -> Result<Vec<ContainerInfo>> {
 
     let options = ListContainersOptions::<String> {
         all: true,
-        size: true,
         ..Default::default()
     };
 
     let containers = docker.list_containers(Some(options)).await?;
 
-    let result = containers
-        .into_iter()
-        .map(|c| {
-            tracing::info!(
-                "bollard container: name={:?} image={:?} image_id={:?}",
-                c.names.as_ref().and_then(|n| n.first()),
-                c.image,
-                c.image_id
-            );
-            let name = c
-                .names
-                .unwrap_or_default()
-                .first()
-                .cloned()
-                .unwrap_or_default()
-                .trim_start_matches('/')
-                .to_string();
-            let info = ContainerInfo {
-                container_name: name,
-                image: c.image.unwrap_or_default(),
-                status: parse_status(c.state.as_deref()),
-                image_id: c.image_id,
-            };
-            tracing::debug!(
-                "Container {} image={} image_id={:?}",
-                info.container_name,
-                info.image,
-                info.image_id
-            );
-            info
-        })
-        .collect();
-
+    let mut result = Vec::new();
+    for c in containers {
+        let name = c
+            .names
+            .unwrap_or_default()
+            .first()
+            .cloned()
+            .unwrap_or_default()
+            .trim_start_matches('/')
+            .to_string();
+        let image = c.image.unwrap_or_default();
+        let status = parse_status(c.state.as_deref());
+        let current_digest = get_image_repo_digest(&image).await;
+        tracing::debug!("Container {} image={} repo_digest={:?}", name, image, current_digest);
+        result.push(ContainerInfo {
+            container_name: name,
+            image,
+            status,
+            image_id: current_digest,
+        });
+    }
     Ok(result)
+}
+
+pub async fn get_image_repo_digest(image_name: &str) -> Option<String> {
+    let docker = match get_docker() {
+        Ok(d) => d,
+        Err(_) => return None,
+    };
+
+    match docker.inspect_image(image_name).await {
+        Ok(image) => {
+            image
+                .repo_digests
+                .unwrap_or_default()
+                .into_iter()
+                .next()
+                .and_then(|d| {
+                    // RepoDigests format: "image@sha256:abc123"
+                    // Extract just the sha256:abc123 part
+                    d.split('@').nth(1).map(|s| s.to_string())
+                })
+        }
+        Err(_) => None,
+    }
 }
 
 #[allow(dead_code)]

@@ -7,6 +7,7 @@ export interface Props {
 }
 
 const { containers, clientId } = Astro.props;
+const hasUpdates = containers.some(c => c.update_available === true);
 
 const apiBase =
   import.meta.env.PUBLIC_API_URL ||
@@ -46,12 +47,14 @@ function modeBadgeClass(mode: string) {
       >
         Update selected
       </button>
-      <button
-        id="update-all-available-btn"
-        class="px-3 py-1.5 rounded-md text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors"
-      >
-        Update all available
-      </button>
+      {hasUpdates && (
+        <button
+          id="update-all-available-btn"
+          class="px-3 py-1.5 rounded-md text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+        >
+          Update all available
+        </button>
+      )}
     </div>
   </div>
 
@@ -94,19 +97,21 @@ function modeBadgeClass(mode: string) {
             <span class={`text-xs px-2 py-0.5 rounded-full ${modeBadgeClass(container.update_mode)}`}>
               {container.update_mode}
             </span>
-            {container.update_available && (
+            {container.update_available === true && (
               <span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
                 update
               </span>
             )}
           </div>
 
-          <button
-            class="update-single-btn text-xs px-2.5 py-1 rounded-md font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors disabled:opacity-50"
-            data-name={container.container_name}
-          >
-            Update
-          </button>
+          {container.update_available === true && container.update_mode === 'manual' && (
+            <button
+              class="update-single-btn text-xs px-2.5 py-1 rounded-md font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors disabled:opacity-50"
+              data-name={container.container_name}
+            >
+              Update
+            </button>
+          )}
         </div>
 
         {container.checked_at && (

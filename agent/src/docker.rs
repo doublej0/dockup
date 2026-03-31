@@ -65,6 +65,7 @@ pub async fn list_all_containers() -> Result<Vec<ContainerInfo>> {
 
     let options = ListContainersOptions::<String> {
         all: true,
+        size: true,
         ..Default::default()
     };
 
@@ -73,6 +74,12 @@ pub async fn list_all_containers() -> Result<Vec<ContainerInfo>> {
     let result = containers
         .into_iter()
         .map(|c| {
+            tracing::info!(
+                "bollard container: name={:?} image={:?} image_id={:?}",
+                c.names.as_ref().and_then(|n| n.first()),
+                c.image,
+                c.image_id
+            );
             let name = c
                 .names
                 .unwrap_or_default()

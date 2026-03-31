@@ -90,6 +90,12 @@ const apiBase =
 
           <div class="flex items-center gap-2">
             <button
+              id="check-versions-btn"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Check for updates
+            </button>
+            <button
               id="edit-client-btn"
               class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
             >
@@ -237,5 +243,22 @@ const apiBase =
         alert(`Failed to delete: ${err.message}`);
       }
     });
+
+    const checkVersionsBtn = document.getElementById('check-versions-btn');
+    if (checkVersionsBtn) {
+      checkVersionsBtn.addEventListener('click', async function() {
+        checkVersionsBtn.disabled = true;
+        checkVersionsBtn.textContent = 'Checking...';
+        try {
+          await fetch(`${apiBase}/api/clients/${clientId}/check-versions`, {
+            method: 'POST',
+          });
+          setTimeout(() => window.location.reload(), 3000);
+        } catch (e) {
+          checkVersionsBtn.disabled = false;
+          checkVersionsBtn.textContent = 'Check for updates';
+        }
+      });
+    }
   })();
 </script>

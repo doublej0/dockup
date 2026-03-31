@@ -191,6 +191,34 @@ pub async fn get_job_handler(
     }
 }
 
+pub async fn check_versions(
+    State(state): State<AppState>,
+    Path(client_id): Path<String>,
+) -> Result<axum::http::StatusCode, (axum::http::StatusCode, Json<ApiError>)> {
+    match db::get_client(&state.db, &client_id).await {
+        Ok(Some(_)) => {
+            state
+                .hub
+                .send_to_agent(&client_id, crate::models::ServerToAgent::CheckVersions)
+                .await;
+            info!("Sent CheckVersions to agent {}", client_id);
+            Ok(axum::http::StatusCode::OK)
+        }
+        Ok(None) => Err((
+            axum::http::StatusCode::NOT_FOUND,
+            Json(ApiError {
+                error: format!("Client {} not found", client_id),
+            }),
+        )),
+        Err(e) => Err((
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiError {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
 pub async fn get_recent_jobs_handler(
     State(state): State<AppState>,
     Query(query): Query<RecentJobsQuery>,

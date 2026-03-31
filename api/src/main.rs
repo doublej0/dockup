@@ -83,6 +83,10 @@ async fn main() -> anyhow::Result<()> {
         )
         // Updates
         .route(
+            "/api/clients/:id/check-versions",
+            post(routes::updates::check_versions),
+        )
+        .route(
             "/api/clients/:id/update",
             post(routes::updates::trigger_update),
         )

@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod clients;
 pub mod containers;
 pub mod onboarding;

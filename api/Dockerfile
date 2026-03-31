@@ -1,3 +1,16 @@
+FROM debian:bookworm-slim AS agent-downloader
+
+ARG AGENT_VERSION=0.1.0
+
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /agent-binaries && \
+    curl -fsSL -o /agent-binaries/dockup-agent-x86_64 \
+        "https://github.com/doublej0/dockup/releases/download/agent-v${AGENT_VERSION}/dockup-agent-x86_64" && \
+    curl -fsSL -o /agent-binaries/dockup-agent-aarch64 \
+        "https://github.com/doublej0/dockup/releases/download/agent-v${AGENT_VERSION}/dockup-agent-aarch64" && \
+    chmod +x /agent-binaries/dockup-agent-x86_64 /agent-binaries/dockup-agent-aarch64
+
 FROM rust:1.88-slim AS builder
 
 RUN apt-get update && apt-get install -y \
@@ -36,6 +49,7 @@ WORKDIR /app
 
 COPY --from=builder /app/target/release/dockup-api ./dockup-api
 COPY --from=builder /app/migrations ./migrations
+COPY --from=agent-downloader /agent-binaries /app/agent-binaries
 
 RUN chown -R appuser:appuser /app
 

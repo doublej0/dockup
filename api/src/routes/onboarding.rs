@@ -101,10 +101,7 @@ pub async fn onboard_client(
         info!("Wrote agent config");
 
         // Download binary
-        let binary_url = format!(
-            "https://github.com/doublej0/dockup/releases/latest/download/dockup-agent-{}",
-            binary_arch
-        );
+        let binary_url = format!("{}/api/agent/download/{}", public_api_url, binary_arch);
         info!("Downloading agent binary from {}", binary_url);
 
         let download_cmd = format!(

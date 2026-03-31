@@ -92,6 +92,11 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/api/jobs", get(routes::updates::get_recent_jobs_handler))
         .route("/api/jobs/:id", get(routes::updates::get_job_handler))
+        // Agent binary distribution
+        .route(
+            "/api/agent/download/:arch",
+            get(routes::agent::download_agent),
+        )
         // Onboarding
         .route("/api/onboard", post(routes::onboarding::onboard_client))
         // WebSocket

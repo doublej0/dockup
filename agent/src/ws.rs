@@ -61,9 +61,13 @@ pub async fn run_agent_loop(config: AgentConfig) {
     let registry = RegistryChecker::new();
 
     loop {
+        let ws_base = config.server_url
+            .trim_end_matches('/')
+            .replace("https://", "wss://")
+            .replace("http://", "ws://");
         let url = format!(
             "{}/api/ws/agent/{}?token={}",
-            config.server_url.trim_end_matches('/'),
+            ws_base,
             config.client_id,
             config.jwt_token
         );

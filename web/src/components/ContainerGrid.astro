@@ -241,6 +241,7 @@ function truncateDigest(digest: string): string {
       try {
         await triggerUpdate(undefined, true);
         updateAllBtn.textContent = 'Triggered!';
+        setTimeout(() => window.location.reload(), 5000);
       } catch(e) {
         updateAllBtn.textContent = 'Failed';
         updateAllBtn.disabled = false;

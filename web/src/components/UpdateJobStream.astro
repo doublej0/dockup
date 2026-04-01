@@ -143,6 +143,9 @@ const wsBase = apiBase.replace(/^http/, 'ws');
             const { job_id, success } = msg.data;
             if (job_id === currentJobId) {
               setComplete(success);
+              if (success) {
+                setTimeout(() => window.location.reload(), 3000);
+              }
             }
             break;
           }

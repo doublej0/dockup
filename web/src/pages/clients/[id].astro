@@ -1,8 +1,7 @@
 ---
 import Layout from '../../components/Layout.astro';
-import ContainerGrid from '../../components/ContainerGrid.astro';
 import UpdateJobStream from '../../components/UpdateJobStream.astro';
-import { getClient, getContainers } from '../../lib/api';
+import { getClient } from '../../lib/api';
 
 const { id } = Astro.params;
 
@@ -11,12 +10,10 @@ if (!id) {
 }
 
 let client = null;
-let containers = [];
 let fetchError = '';
 
 try {
   client = await getClient(id);
-  containers = await getContainers(id, true);
 } catch (e: any) {
   fetchError = e.message;
 }
@@ -167,19 +164,42 @@ const apiBase =
       <!-- Containers -->
       <div class="mb-6">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">Containers</h2>
-        {containers.length > 0 ? (
-          <ContainerGrid containers={containers} clientId={client.id} />
-        ) : (
-          <div class="text-center py-16 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
-            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 mb-3">
-              <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-              </svg>
-            </div>
-            <p class="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">No running containers found on this host</p>
-            <p class="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">If this looks wrong, check that the agent is connected and the Docker socket is accessible.</p>
+
+        <!-- Controls bar -->
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300 cursor-pointer">
+              <input
+                id="show-stopped-toggle"
+                type="checkbox"
+                class="rounded border-gray-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+              />
+              Show stopped
+            </label>
           </div>
-        )}
+          <div class="flex items-center gap-2">
+            <button
+              id="update-selected-btn"
+              class="hidden px-3 py-1.5 rounded-md text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
+              disabled
+            >
+              Update selected
+            </button>
+            <button
+              id="update-all-available-btn"
+              class="hidden px-3 py-1.5 rounded-md text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors disabled:opacity-50"
+            >
+              Update all available
+            </button>
+          </div>
+        </div>
+
+        <!-- Container grid — populated client-side -->
+        <div id="container-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="col-span-full text-center py-12 text-gray-400 dark:text-slate-500">
+            <p class="text-sm">Loading containers…</p>
+          </div>
+        </div>
       </div>
 
       <UpdateJobStream clientId={client.id} />
@@ -189,6 +209,7 @@ const apiBase =
 
 <script define:vars={{ apiBase, clientId: id }}>
   (function() {
+    // --- Timestamp localisation ---
     document.querySelectorAll('.last-seen-ts').forEach(function(el) {
       const ts = el.dataset.ts;
       if (!ts) return;
@@ -196,19 +217,16 @@ const apiBase =
         el.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(ts));
       } catch(e) { /* leave raw */ }
     });
+
+    // --- Edit / Cancel / Save ---
     const editBtn = document.getElementById('edit-client-btn');
     const editForm = document.getElementById('edit-form');
     const cancelBtn = document.getElementById('cancel-edit-btn');
     const clientEditForm = document.getElementById('client-edit-form');
     const deleteBtn = document.getElementById('delete-client-btn');
 
-    editBtn?.addEventListener('click', () => {
-      editForm.classList.toggle('hidden');
-    });
-
-    cancelBtn?.addEventListener('click', () => {
-      editForm.classList.add('hidden');
-    });
+    editBtn?.addEventListener('click', () => { editForm.classList.toggle('hidden'); });
+    cancelBtn?.addEventListener('click', () => { editForm.classList.add('hidden'); });
 
     clientEditForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -244,21 +262,250 @@ const apiBase =
       }
     });
 
+    // --- Check for updates button ---
     const checkVersionsBtn = document.getElementById('check-versions-btn');
-    if (checkVersionsBtn) {
-      checkVersionsBtn.addEventListener('click', async function() {
-        checkVersionsBtn.disabled = true;
-        checkVersionsBtn.textContent = 'Checking...';
-        try {
-          await fetch(`${apiBase}/api/clients/${clientId}/check-versions`, {
-            method: 'POST',
-          });
-          setTimeout(() => window.location.reload(), 3000);
-        } catch (e) {
+    checkVersionsBtn?.addEventListener('click', async function() {
+      checkVersionsBtn.disabled = true;
+      checkVersionsBtn.textContent = 'Checking...';
+      try {
+        await fetch(`/api/proxy?path=/api/clients/${clientId}/check-versions`, { method: 'POST' });
+        setTimeout(fetchAndRenderContainers, 3000);
+        setTimeout(() => {
           checkVersionsBtn.disabled = false;
           checkVersionsBtn.textContent = 'Check for updates';
-        }
-      });
+        }, 3200);
+      } catch (e) {
+        checkVersionsBtn.disabled = false;
+        checkVersionsBtn.textContent = 'Check for updates';
+      }
+    });
+
+    // =========================================================
+    // Client-side container grid rendering
+    // =========================================================
+
+    let showStopped = false;
+
+    function esc(str) {
+      return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+
+    function truncateDigest(digest) {
+      if (!digest) return '';
+      const hash = digest.startsWith('sha256:') ? digest.slice(7) : digest;
+      return hash.slice(0, 8);
+    }
+
+    function statusBadgeClass(status) {
+      if (status === 'running') return 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400';
+      if (status === 'exited' || status === 'dead') return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400';
+      return 'bg-gray-100 dark:bg-slate-600 text-gray-600 dark:text-slate-300';
+    }
+
+    function modeBadgeClass(mode) {
+      if (mode === 'auto') return 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400';
+      return 'bg-gray-100 dark:bg-slate-600 text-gray-500 dark:text-slate-300';
+    }
+
+    function renderDigestDisplay(container) {
+      const cur = container.current_digest;
+      const lat = container.latest_digest;
+      if (lat && !cur) {
+        return `<p class="mt-1 text-xs text-slate-400 dark:text-slate-500 font-mono truncate">latest: ${truncateDigest(lat)}</p>`;
+      }
+      if (cur && lat && cur === lat) {
+        return `<p class="mt-1 text-xs text-slate-500 dark:text-slate-500 font-mono truncate">${truncateDigest(cur)}</p>`;
+      }
+      if (cur && lat && cur !== lat) {
+        return `<p class="mt-1 text-xs font-mono"><span class="text-slate-500">${truncateDigest(cur)}</span><span class="text-amber-400"> \u2192 ${truncateDigest(lat)}</span></p>`;
+      }
+      return '';
+    }
+
+    function renderCard(container) {
+      const name = container.container_name;
+      const isStopped = container.status !== 'running';
+      const updateBadge = container.update_available
+        ? `<span class="container-update-badge text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">update</span>`
+        : '';
+      const updateBtn = container.update_available && container.update_mode === 'manual'
+        ? `<button class="update-single-btn text-xs px-2.5 py-1 rounded-md font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors disabled:opacity-50" data-name="${esc(name)}">Update</button>`
+        : '';
+      const checkedAt = container.checked_at
+        ? `<p class="mt-2 text-xs text-gray-400 dark:text-slate-500">Checked: <span class="checked-at-ts" data-ts="${esc(container.checked_at)}">${esc(container.checked_at)}</span></p>`
+        : '';
+
+      return `
+        <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm p-4 transition-shadow hover:shadow-md${isStopped ? ' container-stopped opacity-60' : ''}"
+             data-container-name="${esc(name)}"
+             data-status="${esc(container.status)}"
+             data-update-available="${container.update_available ? 'true' : 'false'}"
+             data-image="${esc(container.image)}">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="container-checkbox rounded border-gray-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 flex-shrink-0" data-name="${esc(name)}" />
+              <h3 class="text-sm font-semibold truncate" title="${esc(name)}">${esc(name)}</h3>
+            </div>
+            <div class="flex items-center gap-1 flex-shrink-0">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium ${statusBadgeClass(container.status)}">${esc(container.status)}</span>
+            </div>
+          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-slate-400 truncate" title="${esc(container.image)}">${esc(container.image)}</p>
+          <div class="container-digest-display">${renderDigestDisplay(container)}</div>
+          <div class="mt-3 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1 container-badge-row">
+              <span class="text-xs px-2 py-0.5 rounded-full ${modeBadgeClass(container.update_mode)}">${esc(container.update_mode)}</span>
+              ${updateBadge}
+            </div>
+            <span class="container-update-btn-slot">${updateBtn}</span>
+          </div>
+          ${checkedAt}
+        </div>`;
+    }
+
+    // --- Selection state ---
+    const updateSelectedBtn = document.getElementById('update-selected-btn');
+    function updateSelectionState() {
+      const checked = document.querySelectorAll('.container-checkbox:checked');
+      if (checked.length > 0) {
+        updateSelectedBtn.classList.remove('hidden');
+        updateSelectedBtn.disabled = false;
+        updateSelectedBtn.textContent = `Update selected (${checked.length})`;
+      } else {
+        updateSelectedBtn.classList.add('hidden');
+        updateSelectedBtn.disabled = true;
+      }
+    }
+    // Delegate checkbox changes from the grid (re-rendered on refresh)
+    document.getElementById('container-grid')?.addEventListener('change', (e) => {
+      if (e.target.classList.contains('container-checkbox')) updateSelectionState();
+    });
+
+    // --- Trigger update ---
+    async function triggerUpdate(names, all) {
+      const body = {};
+      if (names) body.container_names = names;
+      if (all) body.all = true;
+      const res = await fetch(`/api/proxy?path=/api/clients/${clientId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    // --- fetchAndRenderContainers ---
+    async function fetchAndRenderContainers() {
+      const grid = document.getElementById('container-grid');
+      if (!grid) return;
+      try {
+        const res = await fetch(`/api/proxy?path=/api/clients/${clientId}/containers?show_stopped=${showStopped}`);
+        if (!res.ok) return;
+        const containers = await res.json();
+
+        if (containers.length === 0) {
+          grid.innerHTML = `
+            <div class="col-span-full text-center py-16 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+              <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 mb-3">
+                <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                </svg>
+              </div>
+              <p class="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">No running containers found on this host</p>
+              <p class="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">If this looks wrong, check that the agent is connected and the Docker socket is accessible.</p>
+            </div>`;
+        } else {
+          grid.innerHTML = containers.map(renderCard).join('');
+        }
+
+        // Localise checked_at timestamps
+        grid.querySelectorAll('.checked-at-ts').forEach(el => {
+          const ts = el.dataset.ts;
+          if (!ts) return;
+          try {
+            el.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(ts));
+          } catch { /* leave */ }
+        });
+
+        // Apply show/hide stopped
+        grid.querySelectorAll('.container-stopped').forEach(el => {
+          el.style.display = showStopped ? '' : 'none';
+        });
+
+        // Show/hide "Update all available"
+        const hasUpdates = containers.some(c => c.update_available);
+        const updateAllBtn = document.getElementById('update-all-available-btn');
+        if (updateAllBtn) {
+          updateAllBtn.classList.toggle('hidden', !hasUpdates);
+          updateAllBtn.disabled = false;
+          updateAllBtn.textContent = 'Update all available';
+        }
+
+        // Reset selection state
+        updateSelectionState();
+      } catch { /* ignore */ }
+    }
+
+    // --- Show stopped toggle ---
+    document.getElementById('show-stopped-toggle')?.addEventListener('change', (e) => {
+      showStopped = e.target.checked;
+      fetchAndRenderContainers();
+    });
+
+    // --- Update all available ---
+    document.getElementById('update-all-available-btn')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = 'Triggering…';
+      try {
+        await triggerUpdate(undefined, true);
+        btn.textContent = 'Triggered!';
+      } catch {
+        btn.textContent = 'Failed';
+        btn.disabled = false;
+      }
+    });
+
+    // --- Update selected ---
+    updateSelectedBtn?.addEventListener('click', async () => {
+      const names = Array.from(document.querySelectorAll('.container-checkbox:checked')).map(cb => cb.dataset.name);
+      updateSelectedBtn.disabled = true;
+      updateSelectedBtn.textContent = 'Triggering…';
+      try {
+        await triggerUpdate(names, false);
+        updateSelectedBtn.textContent = 'Triggered!';
+      } catch {
+        updateSelectedBtn.textContent = 'Failed';
+        updateSelectedBtn.disabled = false;
+      }
+    });
+
+    // --- Update single container (event delegation — works after re-render) ---
+    document.getElementById('container-grid')?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.update-single-btn');
+      if (!btn || btn.disabled) return;
+      const name = btn.dataset.name;
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        await triggerUpdate([name], false);
+        btn.textContent = 'Triggered!';
+      } catch {
+        btn.textContent = 'Failed';
+        btn.disabled = false;
+      }
+    });
+
+    // --- React to job completion / dismiss from UpdateJobStream ---
+    window.addEventListener('dockup:jobComplete', () => {
+      setTimeout(fetchAndRenderContainers, 3000);
+    });
+    window.addEventListener('dockup:jobDismissed', () => {
+      fetchAndRenderContainers();
+    });
+
+    // --- Initial load ---
+    fetchAndRenderContainers();
   })();
 </script>

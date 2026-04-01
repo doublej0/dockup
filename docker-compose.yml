@@ -2,9 +2,7 @@ name: dockup
 
 services:
   api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
+    image: ghcr.io/doublej0/dockup-api:latest
     container_name: dockup-api
     restart: unless-stopped
     environment:
@@ -23,9 +21,7 @@ services:
         max-file: "3"
 
   web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
+    image: ghcr.io/doublej0/dockup-web:latest
     container_name: dockup-web
     restart: unless-stopped
     environment:

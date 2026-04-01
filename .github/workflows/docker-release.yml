@@ -1,0 +1,52 @@
+name: Docker Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'api/**'
+      - 'web/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker-release.yml'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get latest agent version
+        id: agent_version
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/doublej0/dockup/releases \
+            | python3 -c "import json,sys; releases=[r for r in json.load(sys.stdin) if r['tag_name'].startswith('agent-v')]; print(releases[0]['tag_name'].replace('agent-v',''))" 2>/dev/null || echo "0.1.9")
+          echo "version=$LATEST" >> $GITHUB_OUTPUT
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          push: true
+          tags: ghcr.io/doublej0/dockup-api:latest
+          build-args: |
+            AGENT_VERSION=${{ steps.agent_version.outputs.version }}
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./web
+          push: true
+          tags: ghcr.io/doublej0/dockup-web:latest

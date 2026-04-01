@@ -131,7 +131,10 @@ pub async fn upsert_container(pool: &SqlitePool, container: &Container) -> Resul
              status = excluded.status,
              current_digest = COALESCE(excluded.current_digest, current_digest),
              latest_digest = COALESCE(excluded.latest_digest, latest_digest),
-             update_available = excluded.update_available,
+             update_available = CASE
+                 WHEN excluded.checked_at IS NOT NULL THEN excluded.update_available
+                 ELSE update_available
+             END,
              checked_at = excluded.checked_at,
              compose_service = excluded.compose_service",
     )

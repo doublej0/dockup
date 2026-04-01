@@ -308,6 +308,10 @@ async fn handle_agent_message(state: &AppState, client_id: &str, text: &str) {
                 job_id: job_id.clone(),
                 success,
             });
+            if success {
+                state.hub.send_to_agent(client_id, crate::models::ServerToAgent::CheckVersions).await;
+                info!("Sent CheckVersions after successful update for client {}", client_id);
+            }
         }
 
         AgentToServer::AgentInfo { version, arch: _ } => {

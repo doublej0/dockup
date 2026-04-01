@@ -57,6 +57,7 @@ const wsBase = apiBase.replace(/^http/, 'ws');
     if (!panel) return;
 
     const wsBase = panel.dataset.wsBase || 'ws://localhost:3101';
+    const clientId = panel.dataset.clientId || '';
     const output = document.getElementById('job-output')!;
     const statusDot = document.getElementById('job-status-dot')!;
     const containerNameEl = document.getElementById('job-container-name')!;
@@ -99,8 +100,80 @@ const wsBase = apiBase.replace(/^http/, 'ws');
       currentJobId = null;
     }
 
+    // --- In-place container refresh ---
+
+    function truncateDigest(digest: string): string {
+      if (!digest) return '';
+      const hash = digest.startsWith('sha256:') ? digest.slice(7) : digest;
+      return hash.slice(0, 8);
+    }
+
+    function renderDigestHtml(container: any): string {
+      const cur: string | null = container.current_digest;
+      const lat: string | null = container.latest_digest;
+      if (lat && !cur) {
+        return `<p class="mt-1 text-xs text-slate-400 dark:text-slate-500 font-mono truncate">latest: ${truncateDigest(lat)}</p>`;
+      }
+      if (cur && lat && cur === lat) {
+        return `<p class="mt-1 text-xs text-slate-500 dark:text-slate-500 font-mono truncate">${truncateDigest(cur)}</p>`;
+      }
+      if (cur && lat && cur !== lat) {
+        return `<p class="mt-1 text-xs font-mono"><span class="text-slate-500">${truncateDigest(cur)}</span><span class="text-amber-400"> \u2192 ${truncateDigest(lat)}</span></p>`;
+      }
+      return '';
+    }
+
+    async function refreshContainers() {
+      try {
+        const res = await fetch(`/api/proxy?path=/api/clients/${clientId}/containers?show_stopped=true`);
+        if (!res.ok) return;
+        const containers: any[] = await res.json();
+
+        for (const container of containers) {
+          const name: string = container.container_name;
+          const card = document.querySelector(`[data-container-name="${CSS.escape(name)}"]`);
+          if (!card) continue;
+
+          // Update digest display
+          const digestEl = card.querySelector('.container-digest-display');
+          if (digestEl) digestEl.innerHTML = renderDigestHtml(container);
+
+          // Update badge
+          const badgeRow = card.querySelector('.container-badge-row');
+          const existingBadge = card.querySelector('.container-update-badge');
+          if (container.update_available) {
+            if (!existingBadge && badgeRow) {
+              badgeRow.insertAdjacentHTML(
+                'beforeend',
+                '<span class="container-update-badge text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">update</span>'
+              );
+            }
+          } else {
+            existingBadge?.remove();
+          }
+
+          // Update button slot — event delegation in ContainerGrid handles clicks
+          const btnSlot = card.querySelector('.container-update-btn-slot');
+          if (btnSlot) {
+            if (container.update_available && container.update_mode === 'manual') {
+              if (!btnSlot.querySelector('.update-single-btn')) {
+                btnSlot.innerHTML = `<button class="update-single-btn text-xs px-2.5 py-1 rounded-md font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors disabled:opacity-50" data-name="${name}">Update</button>`;
+              }
+            } else {
+              btnSlot.innerHTML = '';
+            }
+          }
+
+          (card as HTMLElement).dataset.updateAvailable = container.update_available ? 'true' : 'false';
+        }
+      } catch { /* ignore network errors */ }
+    }
+
+    // --- Panel controls ---
+
     dismissBtn.addEventListener('click', () => {
       hide();
+      refreshContainers();
       setTimeout(resetPanel, 400);
     });
 
@@ -144,13 +217,12 @@ const wsBase = apiBase.replace(/^http/, 'ws');
             if (job_id === currentJobId) {
               setComplete(success);
               if (success) {
-                setTimeout(() => window.location.reload(), 3000);
+                setTimeout(refreshContainers, 3000);
               }
             }
             break;
           }
           case 'ContainerUpdate': {
-            // Could refresh container grid — for now just log
             break;
           }
         }

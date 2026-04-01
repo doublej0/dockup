@@ -23,22 +23,42 @@ pub struct ApiError {
 
 pub async fn list_clients(
     State(state): State<AppState>,
-) -> Result<Json<Vec<crate::models::Client>>, (StatusCode, Json<ApiError>)> {
-    match db::get_all_clients(&state.db).await {
-        Ok(clients) => {
-            info!("Listed {} clients", clients.len());
-            Ok(Json(clients))
-        }
+) -> Result<Json<Vec<crate::models::ClientWithStats>>, (StatusCode, Json<ApiError>)> {
+    let clients = match db::get_all_clients(&state.db).await {
+        Ok(c) => c,
         Err(e) => {
             error!("Failed to list clients: {}", e);
-            Err((
+            return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiError {
                     error: e.to_string(),
                 }),
-            ))
+            ));
         }
+    };
+
+    let mut result = Vec::with_capacity(clients.len());
+    for client in clients {
+        let updates_available = db::get_update_count_for_client(&state.db, &client.id)
+            .await
+            .unwrap_or(0);
+        result.push(crate::models::ClientWithStats {
+            id: client.id,
+            name: client.name,
+            host: client.host,
+            color: client.color,
+            compose_file_path: client.compose_file_path,
+            agent_version: client.agent_version,
+            agent_update_mode: client.agent_update_mode,
+            last_seen: client.last_seen,
+            connected: client.connected,
+            created_at: client.created_at,
+            updates_available,
+        });
     }
+
+    info!("Listed {} clients", result.len());
+    Ok(Json(result))
 }
 
 pub async fn get_client(

@@ -14,6 +14,21 @@ pub struct Client {
     pub created_at: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ClientWithStats {
+    pub id: String,
+    pub name: String,
+    pub host: String,
+    pub color: String,
+    pub compose_file_path: Option<String>,
+    pub agent_version: Option<String>,
+    pub agent_update_mode: String,
+    pub last_seen: Option<String>,
+    pub connected: bool,
+    pub created_at: String,
+    pub updates_available: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Container {
     pub id: String,

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 
 use crate::models::{Client, Container, UpdateJob};
 
@@ -334,4 +334,14 @@ pub async fn get_recent_jobs_filtered(
         }
     };
     Ok(rows)
+}
+
+pub async fn get_update_count_for_client(pool: &SqlitePool, client_id: &str) -> Result<i64, sqlx::Error> {
+    let row = sqlx::query(
+        "SELECT COUNT(*) as count FROM containers WHERE client_id = ? AND update_available = 1",
+    )
+    .bind(client_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(row.get::<i64, _>("count"))
 }

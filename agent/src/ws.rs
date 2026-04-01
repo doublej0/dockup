@@ -54,6 +54,7 @@ pub struct ContainerInfo {
     pub image: String,
     pub status: String,
     pub image_id: Option<String>,
+    pub compose_service: Option<String>,
 }
 
 
@@ -246,16 +247,15 @@ async fn handle_server_message(
             };
 
             for name in &names {
-                let image = containers
-                    .iter()
-                    .find(|c| &c.container_name == name)
-                    .map(|c| c.image.clone())
-                    .unwrap_or_default();
+                let matched = containers.iter().find(|c| &c.container_name == name);
+                let image = matched.map(|c| c.image.clone()).unwrap_or_default();
+                let compose_service = matched.and_then(|c| c.compose_service.as_deref());
 
                 run_container_update(
                     name,
                     &image,
                     config.compose_file_path.as_deref(),
+                    compose_service,
                     out_tx,
                 )
                 .await;
@@ -277,6 +277,7 @@ async fn handle_server_message(
                     &container.container_name,
                     &container.image,
                     config.compose_file_path.as_deref(),
+                    container.compose_service.as_deref(),
                     out_tx,
                 )
                 .await;
@@ -304,6 +305,7 @@ async fn run_container_update(
     name: &str,
     image: &str,
     compose_path: Option<&str>,
+    compose_service: Option<&str>,
     out_tx: &mpsc::Sender<AgentToServer>,
 ) {
     let job_id = Uuid::new_v4().to_string();
@@ -327,7 +329,7 @@ async fn run_container_update(
         }
     });
 
-    let success = updater::run_update(name, image, compose_path, chunk_tx).await;
+    let success = updater::run_update(name, image, compose_path, compose_service, chunk_tx).await;
 
     forward_task.await.ok();
 
@@ -353,6 +355,7 @@ async fn send_container_list(out_tx: &mpsc::Sender<AgentToServer>) {
                     image: c.image,
                     status: c.status,
                     image_id: c.image_id,
+                    compose_service: c.compose_service,
                 })
                 .collect();
             info!("Sending container list: {} containers", list.len());

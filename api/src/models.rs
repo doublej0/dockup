@@ -41,6 +41,7 @@ pub struct Container {
     pub update_mode: String,
     pub status: String,
     pub checked_at: Option<String>,
+    pub compose_service: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -132,4 +133,5 @@ pub struct ContainerInfo {
     pub image: String,
     pub status: String,
     pub image_id: Option<String>,
+    pub compose_service: Option<String>,
 }

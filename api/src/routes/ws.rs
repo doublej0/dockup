@@ -226,6 +226,7 @@ async fn handle_agent_message(state: &AppState, client_id: &str, text: &str) {
                     update_mode: default_update_mode.clone(),
                     status: info_item.status.clone(),
                     checked_at: None,
+                    compose_service: info_item.compose_service.clone(),
                 };
                 if let Err(e) = db::upsert_container(&state.db, &container).await {
                     error!("Failed to upsert container {}: {}", info_item.container_name, e);

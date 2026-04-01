@@ -106,7 +106,7 @@ pub async fn get_containers_for_client(
 ) -> Result<Vec<Container>> {
     let rows = sqlx::query_as::<_, Container>(
         "SELECT id, client_id, container_name, image, current_digest, latest_digest,
-                update_available, update_mode, status, checked_at
+                update_available, update_mode, status, checked_at, compose_service
          FROM containers WHERE client_id = ?",
     )
     .bind(client_id)
@@ -124,15 +124,16 @@ pub async fn get_containers_for_client(
 pub async fn upsert_container(pool: &SqlitePool, container: &Container) -> Result<()> {
     let update_available: i64 = if container.update_available { 1 } else { 0 };
     sqlx::query(
-        "INSERT INTO containers (id, client_id, container_name, image, current_digest, latest_digest, update_available, update_mode, status, checked_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "INSERT INTO containers (id, client_id, container_name, image, current_digest, latest_digest, update_available, update_mode, status, checked_at, compose_service)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(client_id, container_name) DO UPDATE SET
              image = excluded.image,
              status = excluded.status,
              current_digest = COALESCE(excluded.current_digest, current_digest),
              latest_digest = COALESCE(excluded.latest_digest, latest_digest),
              update_available = excluded.update_available,
-             checked_at = excluded.checked_at",
+             checked_at = excluded.checked_at,
+             compose_service = excluded.compose_service",
     )
     .bind(&container.id)
     .bind(&container.client_id)
@@ -144,6 +145,7 @@ pub async fn upsert_container(pool: &SqlitePool, container: &Container) -> Resul
     .bind(&container.update_mode)
     .bind(&container.status)
     .bind(&container.checked_at)
+    .bind(&container.compose_service)
     .execute(pool)
     .await?;
     Ok(())

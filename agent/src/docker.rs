@@ -10,6 +10,7 @@ pub struct ContainerInfo {
     pub image: String,
     pub status: String,
     pub image_id: Option<String>,
+    pub compose_service: Option<String>,
 }
 
 fn get_docker() -> Result<Docker> {
@@ -50,12 +51,17 @@ pub async fn list_running_containers() -> Result<Vec<ContainerInfo>> {
         let image = c.image.unwrap_or_default();
         let status = parse_status(c.state.as_deref());
         let current_digest = get_image_repo_digest(&image).await;
+        let compose_service = c.labels
+            .as_ref()
+            .and_then(|labels| labels.get("com.docker.compose.service"))
+            .cloned();
         tracing::debug!("Container {} image={} repo_digest={:?}", name, image, current_digest);
         result.push(ContainerInfo {
             container_name: name,
             image,
             status,
             image_id: current_digest,
+            compose_service,
         });
     }
     Ok(result)
@@ -84,12 +90,17 @@ pub async fn list_all_containers() -> Result<Vec<ContainerInfo>> {
         let image = c.image.unwrap_or_default();
         let status = parse_status(c.state.as_deref());
         let current_digest = get_image_repo_digest(&image).await;
+        let compose_service = c.labels
+            .as_ref()
+            .and_then(|labels| labels.get("com.docker.compose.service"))
+            .cloned();
         tracing::debug!("Container {} image={} repo_digest={:?}", name, image, current_digest);
         result.push(ContainerInfo {
             container_name: name,
             image,
             status,
             image_id: current_digest,
+            compose_service,
         });
     }
     Ok(result)
@@ -159,17 +170,19 @@ pub async fn recreate_container(
     name: &str,
     image: &str,
     compose_path: Option<&str>,
+    compose_service: Option<&str>,
 ) -> Result<String> {
     info!("Recreating container: {} (image: {})", name, image);
 
     if let Some(path) = compose_path {
         // Use docker compose
+        let service = compose_service.unwrap_or(name);
         let pull_output = std::process::Command::new("docker")
-            .args(["compose", "-f", path, "pull", name])
+            .args(["compose", "-f", path, "pull", service])
             .output()?;
 
         let up_output = std::process::Command::new("docker")
-            .args(["compose", "-f", path, "up", "-d", name])
+            .args(["compose", "-f", path, "up", "-d", service])
             .output()?;
 
         let combined = format!(

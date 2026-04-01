@@ -32,7 +32,7 @@ await Promise.all(
 
 const totalClients = clients.length;
 const connectedClients = clients.filter(c => c.connected).length;
-const totalUpdates = Object.values(summaries).reduce((acc, s) => acc + s.updatesAvailable, 0);
+const totalUpdates = clients.reduce((sum, c) => sum + (c.updates_available || 0), 0);
 const totalContainers = Object.values(summaries).reduce((acc, s) => acc + s.running, 0);
 ---
 

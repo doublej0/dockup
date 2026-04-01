@@ -108,9 +108,9 @@ await Promise.all(
                   {s.running} / {s.total}
                 </td>
                 <td class="px-4 py-3">
-                  {s.updatesAvailable > 0 ? (
+                  {client.updates_available > 0 ? (
                     <span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
-                      {s.updatesAvailable} available
+                      {client.updates_available} available
                     </span>
                   ) : (
                     <span class="text-xs text-gray-400 dark:text-slate-500">—</span>

@@ -38,17 +38,17 @@ function formatLastSeen(ts: string | null): string {
         </h2>
       </div>
 
-      {containerSummary.updatesAvailable > 0 && (
+      {client.updates_available > 0 && (
         <button
           class="flex-shrink-0 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
           data-update-all={client.id}
-          title={`Update all ${containerSummary.updatesAvailable} containers`}
+          title={`Update all ${client.updates_available} containers`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
             <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
           </svg>
-          {containerSummary.updatesAvailable} update{containerSummary.updatesAvailable !== 1 ? 's' : ''}
+          {client.updates_available} update{client.updates_available !== 1 ? 's' : ''}
         </button>
       )}
     </div>

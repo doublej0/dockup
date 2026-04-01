@@ -16,6 +16,7 @@ export interface Client {
   last_seen: string | null;
   connected: boolean;
   created_at: string;
+  updates_available: number;
 }
 
 export interface Container {

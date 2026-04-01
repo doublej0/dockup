@@ -33,12 +33,20 @@ await Promise.all(
 <Layout title="Clients">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-slate-100">Clients</h1>
-    <a
-      href="/clients/new"
-      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
-    >
-      + Add Client
-    </a>
+    <div class="flex items-center gap-2">
+      <button
+        id="check-all-btn"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 text-sm font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Check all
+      </button>
+      <a
+        href="/clients/new"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
+      >
+        + Add Client
+      </a>
+    </div>
   </div>
 
   {fetchError && (
@@ -81,7 +89,7 @@ await Promise.all(
           {clients.map(client => {
             const s = summaries[client.id] ?? { running: 0, updatesAvailable: 0, total: 0 };
             return (
-              <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+              <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors" data-client-id={client.id}>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <span
@@ -107,7 +115,7 @@ await Promise.all(
                 <td class="px-4 py-3 text-gray-700 dark:text-slate-300">
                   {s.running} / {s.total}
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-3" id={`updates-${client.id}`}>
                   {client.updates_available > 0 ? (
                     <span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
                       {client.updates_available} available
@@ -162,4 +170,48 @@ await Promise.all(
       }).format(new Date(ts));
     } catch { /* leave */ }
   });
+
+  function renderUpdatesCell(count: number): string {
+    if (count > 0) {
+      return `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">${count} available</span>`;
+    }
+    return `<span class="text-xs text-gray-400 dark:text-slate-500">—</span>`;
+  }
+
+  async function pollUpdates() {
+    try {
+      const res = await fetch('/api/proxy?path=/api/clients');
+      if (!res.ok) return;
+      const clients: { id: string; updates_available: number }[] = await res.json();
+      for (const client of clients) {
+        const cell = document.getElementById(`updates-${client.id}`);
+        if (cell) {
+          cell.innerHTML = renderUpdatesCell(client.updates_available);
+        }
+      }
+    } catch { /* ignore network errors */ }
+  }
+
+  setInterval(pollUpdates, 30_000);
+
+  // Check all button
+  const checkAllBtn = document.getElementById('check-all-btn') as HTMLButtonElement | null;
+  if (checkAllBtn) {
+    checkAllBtn.addEventListener('click', async () => {
+      checkAllBtn.disabled = true;
+      checkAllBtn.textContent = 'Checking...';
+
+      const clientIds = Array.from(
+        document.querySelectorAll<HTMLElement>('tr[data-client-id]')
+      ).map(row => row.dataset.clientId!);
+
+      await Promise.allSettled(
+        clientIds.map(id =>
+          fetch(`/api/proxy?path=/api/clients/${id}/check-versions`, { method: 'POST' })
+        )
+      );
+
+      setTimeout(() => window.location.reload(), 5000);
+    });
+  }
 </script>

@@ -20,6 +20,16 @@ COPY src ./src
 COPY migrations ./migrations
 RUN cargo build --release
 
+FROM debian:bookworm-slim AS agent-downloader
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
+ARG AGENT_VERSION=0.1.9
+RUN mkdir -p /agent-binaries && \
+    curl -fsSL -o /agent-binaries/dockup-agent-x86_64 \
+      "https://github.com/doublej0/dockup/releases/download/agent-v${AGENT_VERSION}/dockup-agent-x86_64" && \
+    curl -fsSL -o /agent-binaries/dockup-agent-aarch64 \
+      "https://github.com/doublej0/dockup/releases/download/agent-v${AGENT_VERSION}/dockup-agent-aarch64" && \
+    chmod +x /agent-binaries/*
+
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
@@ -36,7 +46,7 @@ WORKDIR /app
 
 COPY --from=builder /app/target/release/dockup-api ./dockup-api
 COPY --from=builder /app/migrations ./migrations
-COPY agent-binaries /app/agent-binaries
+COPY --from=agent-downloader /agent-binaries /app/agent-binaries
 
 RUN chown -R appuser:appuser /app
 
